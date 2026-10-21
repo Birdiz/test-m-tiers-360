@@ -12,7 +12,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
- * Meant for cron (ADR 0009). Exits with 1 only when the source failed, so cron can alert.
+ * Meant for cron (ADR 0009). The report goes to stdout, failures and warnings to stderr, and the exit code is 1
+ * only when the source failed, so cron can alert (ADR 0012).
  */
 #[AsCommand(name: 'app:inscriptions:import', description: 'Imports the registrations of the form API')]
 final class ImportRegistrationsCommand extends Command
@@ -46,23 +47,23 @@ final class ImportRegistrationsCommand extends Command
             ['Unreadable' => $run->getUnreadable()],
         );
 
-        return match ($run->getStatus()) {
-            ImportRunStatus::Failed => $this->fail($io, (string) $run->getError()),
-            ImportRunStatus::Incomplete => $this->warn($io, (string) $run->getError()),
-            default => Command::SUCCESS,
-        };
-    }
+        $errors = $io->getErrorStyle();
+        if ([] !== $run->getProblems()) {
+            $errors->warning(\sprintf('%d submission(s) of the source could not be read and were not imported.', $run->getUnreadable()));
+            $errors->table(['Submission', 'Reason'], array_map(
+                static fn (array $problem): array => [$problem['submission'] ?? '(no id)', $problem['reason']],
+                $run->getProblems(),
+            ));
+        }
 
-    private function fail(SymfonyStyle $io, string $error): int
-    {
-        $io->error($error);
+        if (ImportRunStatus::Failed === $run->getStatus()) {
+            $errors->error((string) $run->getReason());
 
-        return Command::FAILURE;
-    }
-
-    private function warn(SymfonyStyle $io, string $reason): int
-    {
-        $io->warning($reason.' Nothing was removed.');
+            return Command::FAILURE;
+        }
+        if (ImportRunStatus::Incomplete === $run->getStatus()) {
+            $errors->warning($run->getReason().' Nothing was removed.');
+        }
 
         return Command::SUCCESS;
     }

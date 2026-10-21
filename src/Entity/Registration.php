@@ -91,8 +91,7 @@ class Registration
      */
     public function seenInSource(NormalizedSubmission $submission, Session $session, int $runId): bool
     {
-        $this->lastSeenRunId = $runId;
-        $this->removedAt = null;
+        $this->stillInSource($runId);
 
         if ($submission->sourceUpdatedAt <= $this->sourceUpdatedAt) {
             return false;
@@ -101,6 +100,15 @@ class Registration
         $this->copy($submission, $session);
 
         return true;
+    }
+
+    /**
+     * Records that the source still has this registration, without taking its version (it could not be read).
+     */
+    public function stillInSource(int $runId): void
+    {
+        $this->lastSeenRunId = $runId;
+        $this->removedAt = null;
     }
 
     private function copy(NormalizedSubmission $submission, Session $session): void

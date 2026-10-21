@@ -32,11 +32,13 @@ class ImportRun
     #[ORM\Column]
     private int $removed = 0;
 
-    #[ORM\Column]
-    private int $unreadable = 0;
+    /** @var list<array{submission: ?string, reason: string}> unreadable submissions of the source */
+    #[ORM\Column(type: Types::JSON)]
+    private array $problems = [];
 
+    /** Why the run failed or ended incomplete. */
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    private ?string $error = null;
+    private ?string $reason = null;
 
     public function __construct(
         #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
@@ -59,9 +61,9 @@ class ImportRun
         ++$this->updated;
     }
 
-    public function countUnreadable(): void
+    public function reportUnreadable(?string $submission, string $reason): void
     {
-        ++$this->unreadable;
+        $this->problems[] = ['submission' => $submission, 'reason' => $reason];
     }
 
     public function complete(int $removed, \DateTimeImmutable $at): void
@@ -72,13 +74,13 @@ class ImportRun
 
     public function endIncomplete(string $reason, \DateTimeImmutable $at): void
     {
-        $this->error = $reason;
+        $this->reason = $reason;
         $this->finish(ImportRunStatus::Incomplete, $at);
     }
 
-    public function fail(string $error, \DateTimeImmutable $at): void
+    public function fail(string $reason, \DateTimeImmutable $at): void
     {
-        $this->error = $error;
+        $this->reason = $reason;
         $this->finish(ImportRunStatus::Failed, $at);
     }
 
@@ -130,11 +132,19 @@ class ImportRun
 
     public function getUnreadable(): int
     {
-        return $this->unreadable;
+        return \count($this->problems);
     }
 
-    public function getError(): ?string
+    /**
+     * @return list<array{submission: ?string, reason: string}>
+     */
+    public function getProblems(): array
     {
-        return $this->error;
+        return $this->problems;
+    }
+
+    public function getReason(): ?string
+    {
+        return $this->reason;
     }
 }

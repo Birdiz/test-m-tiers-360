@@ -19,10 +19,10 @@ final class SubmissionNormalizer
         $answers = \is_array($submission['answers'] ?? null) ? $submission['answers'] : [];
         $externalId = self::optionalText($submission['id'] ?? null) ?? throw new UnreadableSubmission('no id');
         $status = RegistrationStatus::tryFrom(\is_string($submission['status'] ?? null) ? $submission['status'] : '')
-            ?? throw new UnreadableSubmission(\sprintf('%s: unknown status', $externalId));
-        $createdAt = self::timestamp($submission['created_at'] ?? null) ?? throw new UnreadableSubmission(\sprintf('%s: unreadable created_at', $externalId));
-        $updatedAt = self::timestamp($submission['updated_at'] ?? null) ?? throw new UnreadableSubmission(\sprintf('%s: unreadable updated_at', $externalId));
-        $session = self::session($answers['session'] ?? null) ?? throw new UnreadableSubmission(\sprintf('%s: no readable session', $externalId));
+            ?? throw new UnreadableSubmission('unknown status', $externalId);
+        $createdAt = self::timestamp($submission['created_at'] ?? null) ?? throw new UnreadableSubmission('unreadable created_at', $externalId);
+        $updatedAt = self::timestamp($submission['updated_at'] ?? null) ?? throw new UnreadableSubmission('unreadable updated_at', $externalId);
+        $session = self::session($answers['session'] ?? null) ?? throw new UnreadableSubmission('no readable session', $externalId);
         $anomalies = [];
 
         return new NormalizedSubmission(

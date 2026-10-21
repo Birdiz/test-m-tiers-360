@@ -76,7 +76,7 @@ final class RegistrationImporterTest extends ImportTestCase
 
         $run = $this->runImport();
 
-        self::assertSame(ImportRunStatus::Completed, $run->getStatus(), (string) $run->getError());
+        self::assertSame(ImportRunStatus::Completed, $run->getStatus(), (string) $run->getReason());
         self::assertSame(293, $run->getSeen());
         self::assertSame([1, 2, 3, 4, 5, 5, 6, 7, 8, 8, 9, 10, 11, 12], $this->formApi()->requestedPages());
     }
@@ -111,18 +111,29 @@ final class RegistrationImporterTest extends ImportTestCase
         self::assertSame([1], $this->formApi()->requestedPages());
     }
 
-    public function testUnreadableSubmissionMakesTheRunIncompleteSoNothingIsRemoved(): void
+    public function testUnreadableSubmissionIsReportedWithoutBlockingRemovals(): void
     {
         $submissions = Submissions::dataset('submissions-v1.json');
         $this->formApi()->serve($submissions);
         $this->runImport();
+        // In the source from now on: the 1st submission lost its session (unreadable, but still there), the
+        // 11th was deleted, and one has no id at all.
+        $unreadable = $submissions[0]['id'];
         $submissions[0]['answers']['session'] = null;
-        $this->formApi()->serve(\array_slice($submissions, 0, 50));
+        unset($submissions[10]);
+        $submissions[] = Submissions::submission(submission: ['id' => null]);
+        $this->formApi()->serve(array_values($submissions));
+        $this->runImport();
 
         $run = $this->runImport();
 
-        self::assertSame(ImportRunStatus::Incomplete, $run->getStatus());
-        self::assertSame([49, 1, 0], [$run->getSeen(), $run->getUnreadable(), $run->getRemoved()]);
+        self::assertSame(ImportRunStatus::Completed, $run->getStatus());
+        // Only the deleted one is removed: the unreadable one is still in the source.
+        self::assertSame([1, 2], [$run->getRemoved(), $run->getUnreadable()]);
+        self::assertSame([
+            ['submission' => $unreadable, 'reason' => 'no readable session'],
+            ['submission' => null, 'reason' => 'no id'],
+        ], $run->getProblems());
     }
 
     public function testRegistrationSkippedByAPageShiftIsNotRemoved(): void

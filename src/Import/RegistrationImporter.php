@@ -41,11 +41,15 @@ final class RegistrationImporter
         $operation = null;
         $total = null;
         $totalChanged = false;
+        // Unreadable submissions that match no known registration: in the source, but not countable in our table.
+        $unmatched = 0;
         try {
             foreach ($this->formApi->pages() as $page) {
                 $totalChanged = $totalChanged || (null !== $total && $total !== $page->total);
                 $total ??= $page->total;
-                $operation = $this->entityManager->wrapInTransaction(fn (): Operation => $this->applyPage($page, $run));
+                $operation = $this->entityManager->wrapInTransaction(function () use ($page, $run, &$unmatched): Operation {
+                    return $this->applyPage($page, $run, $unmatched);
+                });
             }
         } catch (ExceptionInterface|SourceUnreadable $e) {
             $this->logger->error('Import run failed: {error}', ['error' => $e->getMessage()]);
@@ -55,9 +59,10 @@ final class RegistrationImporter
             return $run;
         }
 
-        $seen = null === $operation ? 0 : $this->registrations->countSeenIn($operation, $run);
+        $seen = null === $operation ? 0 : $this->registrations->countSeenIn($operation, $run) + $unmatched;
         if (null === $operation || $totalChanged || $seen !== $total) {
-            $run->endIncomplete(\sprintf('Saw %d registrations, the source announced %s.', $seen, $totalChanged ? 'a changing total' : $total), $this->clock->now());
+            $this->logger->warning('Import run incomplete: saw {seen} of {total} submissions, nothing removed.', ['seen' => $seen, 'total' => $total]);
+            $run->endIncomplete(\sprintf('Saw %d submissions, the source announced %s.', $seen, $totalChanged ? 'a changing total' : $total), $this->clock->now());
         } else {
             // The count cannot catch a deletion and an insertion that cancel out while pages shift: a registration
             // skipped that way is only removed if the previous complete run missed it too (ADR 0002).
@@ -70,23 +75,31 @@ final class RegistrationImporter
         return $run;
     }
 
-    private function applyPage(SourcePage $page, ImportRun $run): Operation
+    private function applyPage(SourcePage $page, ImportRun $run, int &$unmatched): Operation
     {
         $operation = $this->operation($page);
         $runId = (int) $run->getId();
 
         $submissions = [];
+        $unreadable = [];
         foreach ($page->submissions as $raw) {
             try {
                 $submission = $this->normalizer->normalize($raw);
                 $submissions[$submission->externalId] = $submission;
             } catch (UnreadableSubmission $e) {
-                $this->logger->warning('Unreadable submission skipped: {reason}', ['reason' => $e->getMessage()]);
-                $run->countUnreadable();
+                $this->logger->warning('Unreadable submission {submission} skipped: {reason}', ['submission' => $e->externalId, 'reason' => $e->getMessage()]);
+                $run->reportUnreadable($e->externalId, $e->getMessage());
+                $unreadable[] = $e->externalId;
             }
         }
 
-        $known = $this->registrations->findByExternalIds($operation, array_keys($submissions));
+        $ids = [...array_keys($submissions), ...array_filter($unreadable)];
+        $known = $this->registrations->findByExternalIds($operation, array_map('strval', $ids));
+        // An unreadable submission we already know is still in the source: it must not be removed.
+        foreach ($unreadable as $externalId) {
+            null !== $externalId && isset($known[$externalId]) ? $known[$externalId]->stillInSource($runId) : ++$unmatched;
+        }
+
         foreach ($submissions as $externalId => $submission) {
             $session = $this->session($operation, $submission->session);
             $registration = $known[$externalId] ?? null;
