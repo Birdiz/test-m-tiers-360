@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0009
+---
+
 # Un passage d'import = un message asynchrone, lu page par page
 
 La commande `app:inscriptions:import` envoie un message `RunImport` sur un transport Messenger asynchrone
