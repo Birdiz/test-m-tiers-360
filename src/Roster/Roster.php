@@ -5,6 +5,7 @@ namespace App\Roster;
 use App\Entity\Registration;
 use App\Entity\RegistrationStatus;
 use App\Entity\Session;
+use App\Entity\StructureType;
 
 /**
  * What the ops team reads for one session. Computed on read (ADRs 0004, 0008).
@@ -43,6 +44,15 @@ final readonly class Roster
             if (null !== $person && isset($peopleElsewhere[$person])) {
                 $reasons[] = ReviewReason::OtherSession;
             }
+            if (null === $registration->getEmail() && null === $registration->getPhone()) {
+                $reasons[] = ReviewReason::Unreachable;
+            }
+            if ([] !== $registration->getAnomalies()) {
+                $reasons[] = ReviewReason::Anomaly;
+            }
+            if (null !== $registration->getComment()) {
+                $reasons[] = ReviewReason::Comment;
+            }
 
             $entries[] = new RosterEntry(
                 externalId: $registration->getExternalId(),
@@ -52,6 +62,7 @@ final readonly class Roster
                 lastName: $registration->getLastName(),
                 email: $registration->getEmail(),
                 phone: $registration->getPhone(),
+                age: $registration->getBirthDate()?->diff($session->getDate())->y,
                 structureType: $registration->getStructureType(),
                 structureName: $registration->getStructureName(),
                 comment: $registration->getComment(),
@@ -67,6 +78,36 @@ final readonly class Roster
             estimatedPeople: \count($active) - array_sum(array_map(static fn (int $count): int => $count - 1, $peopleHere)),
             remainingSeats: max(0, $capacity - \count($active)),
             overbookedBy: max(0, \count($active) - $capacity),
+            byStructure: self::byStructure($active),
+            ages: [
+                'minors' => \count(array_filter($entries, static fn (RosterEntry $e): bool => null !== $e->age && $e->age < 18)),
+                'adults' => \count(array_filter($entries, static fn (RosterEntry $e): bool => null !== $e->age && $e->age >= 18)),
+                'unknown' => \count(array_filter($entries, static fn (RosterEntry $e): bool => null === $e->age)),
+            ],
+            unreachable: \count(array_filter($entries, static fn (RosterEntry $e): bool => \in_array(ReviewReason::Unreachable, $e->reviewReasons, true))),
+            toReview: array_column(
+                array_map(static fn (RosterEntry $e): array => [$e->externalId, $e->reviewReasons], array_filter($entries, static fn (RosterEntry $e): bool => [] !== $e->reviewReasons)),
+                1,
+                0,
+            ),
         ), $entries);
+    }
+
+    /**
+     * @param list<Registration> $active
+     *
+     * @return list<array{type: StructureType, name: ?string, count: int}>
+     */
+    private static function byStructure(array $active): array
+    {
+        $groups = [];
+        foreach ($active as $registration) {
+            $key = $registration->getStructureType()->value.'|'.$registration->getStructureName();
+            $groups[$key] ??= ['type' => $registration->getStructureType(), 'name' => $registration->getStructureName(), 'count' => 0];
+            ++$groups[$key]['count'];
+        }
+        usort($groups, static fn (array $a, array $b): int => [$b['count'], $a['name']] <=> [$a['count'], $b['name']]);
+
+        return $groups;
     }
 }

@@ -21,6 +21,8 @@ final readonly class RosterEntry
         public string $lastName,
         public ?string $email,
         public ?string $phone,
+        /** On the session date; null when the birth date is unknown. */
+        public ?int $age,
         public StructureType $structureType,
         public ?string $structureName,
         public ?string $comment,

@@ -2,6 +2,7 @@
 
 namespace App\Tests\Import;
 
+use App\Entity\StructureType;
 use App\Roster\ReviewReason;
 use App\Roster\RosterEntry;
 
@@ -85,6 +86,58 @@ final class SessionRosterTest extends ImportTestCase
 
         self::assertSame(['sub_theo1' => [ReviewReason::OtherSession]], self::reviewReasons($this->roster('ses_01')->registrations));
         self::assertSame(['sub_theo2' => [ReviewReason::OtherSession]], self::reviewReasons($this->roster('ses_02')->registrations));
+    }
+
+    public function testAgeIsTakenOnTheSessionDate(): void
+    {
+        // The session is on 2026-11-17.
+        $this->formApi()->serve([
+            self::registration('sub_17', '2026-09-01T10:00:00Z', answers: ['birth_date' => '2008-11-18']),
+            self::registration('sub_18', '2026-09-02T10:00:00Z', answers: ['birth_date' => '2008-11-17']),
+            self::registration('sub_unknown', '2026-09-03T10:00:00Z', answers: ['birth_date' => '1900-01-01']),
+        ]);
+
+        $this->runImport();
+        $roster = $this->roster('ses_01');
+
+        self::assertSame([17, 18, null], array_map(static fn (RosterEntry $entry): ?int => $entry->age, $roster->registrations));
+        self::assertSame(['minors' => 1, 'adults' => 1, 'unknown' => 1], $roster->summary->ages);
+    }
+
+    public function testRegistrationsToReviewSayWhy(): void
+    {
+        $this->formApi()->serve([
+            self::registration('sub_clean', '2026-09-01T10:00:00Z', answers: self::person('Léa', 'lea@example.com', '2009-05-21')),
+            self::registration('sub_unreachable', '2026-09-02T10:00:00Z', answers: ['email' => null, 'phone' => null]),
+            self::registration('sub_phone_only', '2026-09-03T10:00:00Z', answers: ['email' => "pas d'adresse"]),
+            self::registration('sub_comment', '2026-09-04T10:00:00Z', answers: [...self::person('Nina', 'nina@example.com', '2008-11-06'), 'comment' => "Besoin d'un accès PMR."]),
+        ]);
+
+        $this->runImport();
+        $summary = $this->roster('ses_01')->summary;
+
+        self::assertSame(1, $summary->unreachable);
+        self::assertSame([
+            'sub_unreachable' => [ReviewReason::Unreachable, ReviewReason::Anomaly],
+            'sub_phone_only' => [ReviewReason::Anomaly],
+            'sub_comment' => [ReviewReason::Comment],
+        ], $summary->toReview);
+    }
+
+    public function testRegistrationsAreCountedByStructure(): void
+    {
+        $this->formApi()->serve([
+            self::registration('sub_1', '2026-09-01T10:00:00Z', answers: ['structure_name' => 'Lycée des Quatre-Vallées']),
+            self::registration('sub_2', '2026-09-02T10:00:00Z', answers: ['structure_type' => 'mission_locale', 'structure_name' => 'Mission locale de Belley']),
+            self::registration('sub_3', '2026-09-03T10:00:00Z', answers: ['structure_name' => 'Lycée des Quatre-Vallées']),
+        ]);
+
+        $this->runImport();
+
+        self::assertSame([
+            ['type' => StructureType::Lycee, 'name' => 'Lycée des Quatre-Vallées', 'count' => 2],
+            ['type' => StructureType::MissionLocale, 'name' => 'Mission locale de Belley', 'count' => 1],
+        ], $this->roster('ses_01')->summary->byStructure);
     }
 
     /**
