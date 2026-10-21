@@ -3,6 +3,7 @@
 namespace App\Tests\Import;
 
 use App\Entity\ImportRunStatus;
+use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class RegistrationImporterTest extends ImportTestCase
 {
@@ -47,5 +48,49 @@ final class RegistrationImporterTest extends ImportTestCase
             $this->roster($id)->summary->removed,
         ], ['ses_01', 'ses_02', 'ses_03', 'ses_04']);
         self::assertSame([[78, 5, 1], [53, 1, 1], [49, 2, 0], [109, 6, 0]], $summaries);
+    }
+
+    public function testServerErrorAndSlowPageAreRetried(): void
+    {
+        // What the kit's mock does: page 5 fails once, page 8 is too slow every other call.
+        $this->formApi()->serveDataset('submissions-v1.json');
+        $this->formApi()->script(5, FakeFormApi::serverError());
+        $this->formApi()->script(8, FakeFormApi::maxDurationReached());
+
+        $run = $this->runImport();
+
+        self::assertSame(ImportRunStatus::Completed, $run->getStatus(), (string) $run->getError());
+        self::assertSame(293, $run->getSeen());
+        self::assertSame([1, 2, 3, 4, 5, 5, 6, 7, 8, 8, 9, 10, 11, 12], $this->formApi()->requestedPages());
+    }
+
+    public function testSourceStillFailingAfterRetriesFailsTheRunWithoutRemovingAnything(): void
+    {
+        $this->formApi()->serveDataset('submissions-v1.json');
+        $this->runImport();
+        $this->formApi()->serveDataset('submissions-v2.json');
+        $this->formApi()->script(5, ...array_fill(0, 4, FakeFormApi::serverError()));
+
+        $run = $this->runImport();
+
+        self::assertSame(ImportRunStatus::Failed, $run->getStatus());
+        self::assertSame(0, $run->getRemoved());
+        // Once in the first run, then 1 call + 3 retries in this one.
+        self::assertCount(5, array_keys($this->formApi()->requestedPages(), 5));
+        // sub_5m3rfhnkfb left the source in v2, but this run did not see the whole source.
+        self::assertSame(0, $this->roster('ses_01')->summary->removed);
+        // Pages read before the failure are applied: page 1 of v2 holds cancellations of ses_01.
+        self::assertSame(100, $run->getSeen());
+    }
+
+    public function testClientErrorIsNotRetried(): void
+    {
+        $this->formApi()->serveDataset('submissions-v1.json');
+        $this->formApi()->script(1, new MockResponse('{"error":"invalid_parameter"}', ['http_code' => 400]));
+
+        $run = $this->runImport();
+
+        self::assertSame(ImportRunStatus::Failed, $run->getStatus());
+        self::assertSame([1], $this->formApi()->requestedPages());
     }
 }

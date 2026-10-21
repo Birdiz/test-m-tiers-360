@@ -64,11 +64,13 @@ final class FakeFormApi
         return new MockResponse('{"error":"internal_error","message":"An unexpected error occurred."}', ['http_code' => 500]);
     }
 
+    /**
+     * Nothing received before max_duration, like the kit's slow page 8. A body cut after a 200 status
+     * would not be retried by Symfony: the retry strategy decides on the status code.
+     */
     public static function maxDurationReached(): MockResponse
     {
-        return new MockResponse((static function (): \Generator {
-            yield new \RuntimeException('Max duration was reached.');
-        })());
+        return new MockResponse('', ['error' => 'Max duration was reached.']);
     }
 
     /**
