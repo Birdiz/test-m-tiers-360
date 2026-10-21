@@ -5,6 +5,7 @@ namespace App\Tests\Import;
 use App\Entity\RegistrationStatus;
 use App\Entity\StructureType;
 use App\Import\SubmissionNormalizer;
+use App\Import\UnreadableSubmission;
 use App\Import\Anomaly;
 use App\Import\AnomalyCode;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -110,6 +111,81 @@ final class SubmissionNormalizerTest extends TestCase
         yield 'impossible day' => ['2009-02-30', null, new Anomaly('birth_date', AnomalyCode::Invalid, '2009-02-30')];
         yield 'free text' => ['mai 2009', null, new Anomaly('birth_date', AnomalyCode::Invalid, 'mai 2009')];
         yield 'missing' => [null, null, new Anomaly('birth_date', AnomalyCode::Missing, null)];
+    }
+
+    #[DataProvider('structureTypes')]
+    public function testStructureTypeOutsideTheFormListIsKeptAsOther(string $raw, Anomaly $anomaly): void
+    {
+        $normalized = (new SubmissionNormalizer())->normalize(self::submission(['structure_type' => $raw]));
+
+        self::assertSame(StructureType::Other, $normalized->structureType);
+        self::assertEquals([$anomaly], $normalized->anomalies);
+    }
+
+    /**
+     * @return iterable<string, array{string, Anomaly}>
+     */
+    public static function structureTypes(): iterable
+    {
+        yield 'cfa' => ['cfa', new Anomaly('structure_type', AnomalyCode::Unknown, 'cfa')];
+        yield 'free text' => ['Autre : association de quartier', new Anomaly('structure_type', AnomalyCode::Unknown, 'Autre : association de quartier')];
+        yield 'empty' => ['', new Anomaly('structure_type', AnomalyCode::Missing, null)];
+    }
+
+    public function testMissingStructureNameIsFlagged(): void
+    {
+        $normalized = (new SubmissionNormalizer())->normalize(self::submission(['structure_name' => null]));
+
+        self::assertNull($normalized->structureName);
+        self::assertEquals([new Anomaly('structure_name', AnomalyCode::Missing, null)], $normalized->anomalies);
+    }
+
+    public function testMissingNameIsFlagged(): void
+    {
+        $normalized = (new SubmissionNormalizer())->normalize(self::submission(['last_name' => null]));
+
+        self::assertSame('', $normalized->lastName);
+        self::assertEquals([new Anomaly('last_name', AnomalyCode::Missing, null)], $normalized->anomalies);
+    }
+
+    public function testFreeTextIsTrimmedAndBlankCommentIsDropped(): void
+    {
+        $normalized = (new SubmissionNormalizer())->normalize(self::submission([
+            'first_name' => ' Léa ',
+            'last_name' => 'Martin ',
+            'structure_name' => ' Lycée des Quatre-Vallées',
+            'comment' => '   ',
+        ]));
+
+        self::assertSame(['Léa', 'Martin', 'Lycée des Quatre-Vallées', null], [
+            $normalized->firstName,
+            $normalized->lastName,
+            $normalized->structureName,
+            $normalized->comment,
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $submission
+     */
+    #[DataProvider('unreadableSubmissions')]
+    public function testSubmissionThatCannotBePlacedIsUnreadable(array $submission): void
+    {
+        $this->expectException(UnreadableSubmission::class);
+
+        (new SubmissionNormalizer())->normalize($submission);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function unreadableSubmissions(): iterable
+    {
+        yield 'no id' => [self::submission(submission: ['id' => null])];
+        yield 'unknown status' => [self::submission(submission: ['status' => 'deleted'])];
+        yield 'no session' => [self::submission(['session' => null])];
+        yield 'session without id' => [self::submission(['session' => ['label' => 'Belley']])];
+        yield 'unreadable timestamp' => [self::submission(submission: ['updated_at' => 'yesterday-ish'])];
     }
 
     /**
