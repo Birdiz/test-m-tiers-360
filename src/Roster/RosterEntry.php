@@ -7,7 +7,7 @@ use App\Entity\StructureType;
 /**
  * An active registration as the ops team reads it.
  */
-final readonly class RosterEntry
+final readonly class RosterEntry implements \JsonSerializable
 {
     /**
      * @param list<array{field: string, code: string, raw: ?string}> $anomalies
@@ -29,5 +29,26 @@ final readonly class RosterEntry
         public array $anomalies,
         public array $reviewReasons,
     ) {
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return [
+            'id' => $this->externalId,
+            'rank' => $this->rank,
+            'beyondCapacity' => $this->beyondCapacity,
+            'firstName' => $this->firstName,
+            'lastName' => $this->lastName,
+            'email' => $this->email,
+            'phone' => $this->phone,
+            'age' => $this->age,
+            'structure' => ['type' => $this->structureType, 'name' => $this->structureName],
+            'comment' => $this->comment,
+            'anomalies' => $this->anomalies,
+            'reviewReasons' => $this->reviewReasons,
+        ];
     }
 }

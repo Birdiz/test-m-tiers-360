@@ -1,0 +1,20 @@
+security:
+    providers:
+        ops:
+            memory:
+                users:
+                    ops: { roles: ['ROLE_OPS'] }
+
+    firewalls:
+        dev:
+            pattern: ^/(_(profiler|wdt)|css|images|js)/
+            security: false
+        api:
+            pattern: ^/api
+            stateless: true
+            provider: ops
+            access_token:
+                token_handler: App\Security\OpsTokenHandler
+
+    access_control:
+        - { path: ^/api, roles: ROLE_OPS }

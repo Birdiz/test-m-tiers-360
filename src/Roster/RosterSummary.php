@@ -5,7 +5,7 @@ namespace App\Roster;
 use App\Entity\ImportRunStatus;
 use App\Entity\StructureType;
 
-final readonly class RosterSummary
+final readonly class RosterSummary implements \JsonSerializable
 {
     /**
      * @param list<array{type: StructureType, name: ?string, count: int}> $byStructure most represented first
@@ -30,5 +30,29 @@ final readonly class RosterSummary
         public ?ImportRunStatus $lastRunStatus,
         public ?\DateTimeImmutable $lastRunAt,
     ) {
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return [
+            'active' => $this->active,
+            'cancelled' => $this->cancelled,
+            'removed' => $this->removed,
+            'estimatedPeople' => $this->estimatedPeople,
+            'remainingSeats' => $this->remainingSeats,
+            'overbookedBy' => $this->overbookedBy,
+            'byStructure' => $this->byStructure,
+            'ages' => $this->ages,
+            'unreachable' => $this->unreachable,
+            'toReview' => (object) $this->toReview,
+            'data' => [
+                'asOf' => $this->dataAsOf?->format(\DATE_ATOM),
+                'lastRunStatus' => $this->lastRunStatus,
+                'lastRunAt' => $this->lastRunAt?->format(\DATE_ATOM),
+            ],
+        ];
     }
 }

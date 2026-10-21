@@ -11,7 +11,7 @@ use App\Entity\StructureType;
 /**
  * What the ops team reads for one session. Computed on read (ADRs 0004, 0008).
  */
-final readonly class Roster
+final readonly class Roster implements \JsonSerializable
 {
     /**
      * @param list<RosterEntry> $registrations active registrations, first come first served
@@ -113,5 +113,23 @@ final readonly class Roster
         usort($groups, static fn (array $a, array $b): int => [$b['count'], $a['name']] <=> [$a['count'], $b['name']]);
 
         return $groups;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return [
+            'session' => [
+                'id' => $this->session->getExternalId(),
+                'label' => $this->session->getLabel(),
+                'date' => $this->session->getDate()->format('Y-m-d'),
+                'location' => $this->session->getLocation(),
+                'capacity' => $this->session->getCapacity(),
+            ],
+            'summary' => $this->summary,
+            'registrations' => $this->registrations,
+        ];
     }
 }
