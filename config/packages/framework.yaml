@@ -16,17 +16,10 @@ framework:
 
     http_client:
         scoped_clients:
-            # The form API is a third party: slow pages are cut by max_duration (an idle "timeout"
-            # is not retried by Symfony), then 429/5xx/transport errors are retried with backoff,
-            # honouring Retry-After.
+            # Each attempt is cut after max_duration; FormApi retries (ADR 0011).
             form_api.client:
                 base_uri: '%env(FORM_API_BASE_URI)%'
                 max_duration: 10
-                retry_failed:
-                    max_retries: 3
-                    delay: 1000
-                    multiplier: 2
-                    max_delay: 30000
     #fragments: true
     php_errors:
         log: true
@@ -36,12 +29,5 @@ when@test:
         test: true
         http_client:
             mock_response_factory: App\Tests\Import\FakeFormApi
-            scoped_clients:
-                form_api.client:
-                    base_uri: '%env(FORM_API_BASE_URI)%'
-                    max_duration: 10
-                    retry_failed:
-                        max_retries: 3
-                        delay: 0
         session:
             storage_factory_id: session.storage.factory.mock_file

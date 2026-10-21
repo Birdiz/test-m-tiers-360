@@ -20,6 +20,11 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
+    App\Import\FormApi:
+        arguments:
+            $maxRetries: 3
+            $retryDelayMs: 1000
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
 
@@ -30,7 +35,7 @@ when@test:
             autoconfigure: true
         App\Tests\Import\FakeFormApi:
             public: true
-        App\Import\RegistrationImporter:
-            public: true
-        App\Roster\SessionRoster:
-            public: true
+        App\Import\FormApi:
+            arguments:
+                $maxRetries: 3
+                $retryDelayMs: 0
