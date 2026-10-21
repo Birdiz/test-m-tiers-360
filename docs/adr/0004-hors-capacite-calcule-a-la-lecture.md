@@ -1,6 +1,6 @@
 # « Hors capacité » est calculé à la lecture, pas stocké
 
-L'outil de formulaire ne ferme pas les sessions pleines (ex. 83 inscriptions pour 80 places). On ne refuse
+L'outil de formulaire ne ferme pas les sessions pleines (ex. 47 inscriptions actives pour 40 places à Belley). On ne refuse
 rien à l'import. À la lecture, les inscriptions actives sont classées par date de soumission (premier arrivé,
 premier servi) et celles au-delà de la capacité sont marquées hors capacité. Comme ce n'est pas un statut
 stocké, une annulation fait remonter automatiquement la suivante, sans traitement à rejouer.
