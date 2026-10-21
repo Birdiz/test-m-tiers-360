@@ -5,6 +5,10 @@ rien à l'import. À la lecture, les inscriptions actives sont classées par dat
 premier servi) et celles au-delà de la capacité sont marquées hors capacité. Comme ce n'est pas un statut
 stocké, une annulation fait remonter automatiquement la suivante, sans traitement à rejouer.
 
+Une inscription déplacée d'une autre session prend son rang à la date où elle y est arrivée (la date de
+modification de la version qui montre le déplacement), pas à sa date de soumission : sinon les trois
+déplacements vers Belley du jeu de données passeraient devant des personnes inscrites à Belley avant eux.
+
 ## Considered Options
 
 - Statut « liste d'attente » écrit à l'import : à recalculer à chaque annulation, et invente une règle métier

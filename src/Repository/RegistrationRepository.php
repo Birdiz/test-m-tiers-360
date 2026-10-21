@@ -66,11 +66,11 @@ class RegistrationRepository extends ServiceEntityRepository
     }
 
     /**
-     * @return list<Registration>
+     * @return list<Registration> in queue order: first come, first served in this session (ADR 0004)
      */
     public function findBySession(Session $session): array
     {
-        return $this->findBy(['session' => $session], ['sourceCreatedAt' => 'ASC', 'externalId' => 'ASC']);
+        return $this->findBy(['session' => $session], ['joinedSessionAt' => 'ASC', 'externalId' => 'ASC']);
     }
 
     /**

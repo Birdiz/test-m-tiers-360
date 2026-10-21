@@ -34,6 +34,13 @@ class Registration
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $sourceUpdatedAt;
 
+    /**
+     * When it took its place in the current session's queue: submitted there, or moved there from another
+     * session (the source version that showed the move). First come, first served counts from here (ADR 0004).
+     */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    private \DateTimeImmutable $joinedSessionAt;
+
     #[ORM\Column(length: 255)]
     private string $firstName;
 
@@ -81,6 +88,7 @@ class Registration
         int $runId,
     ) {
         $this->copy($submission, $session);
+        $this->joinedSessionAt = $submission->sourceCreatedAt;
         $this->lastSeenRunId = $runId;
     }
 
@@ -97,6 +105,9 @@ class Registration
             return false;
         }
 
+        if ($session->getId() !== $this->session->getId()) {
+            $this->joinedSessionAt = $submission->sourceUpdatedAt;
+        }
         $this->copy($submission, $session);
 
         return true;

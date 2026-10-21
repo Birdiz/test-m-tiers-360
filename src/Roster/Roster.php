@@ -24,7 +24,7 @@ final readonly class Roster implements \JsonSerializable
     }
 
     /**
-     * @param list<Registration> $registrations every registration of the session, oldest first
+     * @param list<Registration> $registrations every registration of the session, in queue order
      * @param list<Registration> $elsewhere     active registrations of other sessions sharing an email with this one
      */
     public static function of(Session $session, array $registrations, array $elsewhere, ?ImportRun $lastRun, ?ImportRun $lastCompletedRun): self

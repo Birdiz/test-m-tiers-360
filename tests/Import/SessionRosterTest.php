@@ -54,6 +54,30 @@ final class SessionRosterTest extends ImportTestCase
         self::assertSame([0, 0], [$this->roster('ses_01')->summary->remainingSeats, $this->roster('ses_01')->summary->overbookedBy]);
     }
 
+    public function testRegistrationMovedFromAnotherSessionQueuesFromWhenItArrived(): void
+    {
+        // As sub_haczwpup6e in the kit's data: registered early elsewhere, moved here later.
+        $oyonnax = ['session' => ['id' => 'ses_02', 'label' => 'Oyonnax — 18 novembre', 'date' => '2026-11-18', 'location' => 'Centre culturel', 'capacity' => 80]];
+        $this->formApi()->serve([
+            self::registration('sub_mover', '2026-08-15T10:00:00Z', answers: $oyonnax),
+            self::registration('sub_early', '2026-09-01T10:00:00Z'),
+            self::registration('sub_late', '2026-09-20T10:00:00Z'),
+        ]);
+        $this->runImport();
+        $this->formApi()->serve([
+            self::registration('sub_mover', '2026-08-15T10:00:00Z', ['updated_at' => '2026-10-01T10:00:00Z']),
+            self::registration('sub_early', '2026-09-01T10:00:00Z'),
+            self::registration('sub_late', '2026-09-20T10:00:00Z'),
+        ]);
+
+        $this->runImport();
+
+        self::assertSame([['sub_early', false], ['sub_late', false], ['sub_mover', true]], array_map(
+            static fn (RosterEntry $entry): array => [$entry->externalId, $entry->beyondCapacity],
+            $this->roster('ses_01')->registrations,
+        ));
+    }
+
     public function testSamePersonTwiceIsAProbableDuplicateButSiblingsSharingAnEmailAreNot(): void
     {
         $this->formApi()->serve([
