@@ -22,8 +22,12 @@ _Éviter_ : établissement, partenaire
 
 **Inscription** :
 Une réponse au formulaire, identifiée par l'outil externe, qui demande une place dans une session.
-Une même personne peut avoir plusieurs inscriptions.
-_Éviter_ : soumission, réponse, participant
+Une même personne peut avoir plusieurs inscriptions. Dans le code : `Registration`.
+_Éviter_ : participant, réponse
+
+**Soumission** :
+Une inscription telle que l'API du formulaire la sert, avant import : c'est le mot de l'API (`submissions`),
+réservé à ce qui vient de la source. Dans le code : `Submission`.
 
 **Inscription active** :
 Inscription que la source donne comme soumise (ni annulée, ni retirée). Seules les inscriptions actives
@@ -60,5 +64,24 @@ _Éviter_ : erreur, rejet
 
 **Passage d'import** :
 Une exécution de l'import qui relit toutes les inscriptions de la source. Il est **complet** quand toutes
-les pages ont été lues et que le nombre d'inscriptions vues correspond au total annoncé par la source.
-_Éviter_ : synchro, job, run
+les pages ont été lues et que le nombre de soumissions vues correspond au total annoncé par la source.
+Dans le code : `ImportRun`.
+_Éviter_ : synchro, job
+
+**Soumission illisible** :
+Soumission impossible à rattacher à une inscription ou à une session (sans identifiant, sans session…).
+Elle n'est pas importée mais elle est consignée dans le passage d'import.
+
+## Lecture
+
+**Synthèse de session** :
+Ce que l'équipe opérations lit pour une session : les inscriptions actives dans l'ordre d'arrivée et leurs
+comptes. Dans le code : `Roster`.
+_Éviter_ : rapport, export
+
+**À revoir** :
+Inscription active que l'équipe opérations devrait regarder, avec ses raisons : doublon probable, inscrite sur
+une autre session, injoignable, anomalie, commentaire.
+
+**Injoignable** :
+Inscription sans adresse e-mail valide ni téléphone.
