@@ -191,7 +191,7 @@ final class SessionRosterTest extends ImportTestCase
      */
     private static function registration(string $id, string $createdAt, array $submission = [], array $answers = []): array
     {
-        return SubmissionNormalizerTest::submission(
+        return Submissions::submission(
             ['session' => ['id' => 'ses_01', 'label' => 'Bourg-en-Bresse — 17 novembre', 'date' => '2026-11-17', 'location' => 'Espace des métiers', 'capacity' => 2], ...$answers],
             ['id' => $id, 'created_at' => $createdAt, 'updated_at' => $createdAt, ...$submission],
         );

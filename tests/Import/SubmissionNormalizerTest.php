@@ -15,7 +15,7 @@ final class SubmissionNormalizerTest extends TestCase
 {
     public function testCleanSubmissionIsNormalizedWithoutAnomaly(): void
     {
-        $normalized = (new SubmissionNormalizer())->normalize(self::submission());
+        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission());
 
         self::assertSame('sub_k3m9qz7tpe', $normalized->externalId);
         self::assertSame(RegistrationStatus::Submitted, $normalized->status);
@@ -37,7 +37,7 @@ final class SubmissionNormalizerTest extends TestCase
     #[DataProvider('emails')]
     public function testEmailIsTrimmedAndLowercasedOrFlagged(mixed $raw, ?string $expected, ?Anomaly $anomaly): void
     {
-        $normalized = (new SubmissionNormalizer())->normalize(self::submission(['email' => $raw]));
+        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission(['email' => $raw]));
 
         self::assertSame($expected, $normalized->email);
         self::assertEquals(null === $anomaly ? [] : [$anomaly], $normalized->anomalies);
@@ -58,7 +58,7 @@ final class SubmissionNormalizerTest extends TestCase
 
     public function testMissingEmailKeyIsFlagged(): void
     {
-        $submission = self::submission();
+        $submission = Submissions::submission();
         unset($submission['answers']['email']);
 
         $normalized = (new SubmissionNormalizer())->normalize($submission);
@@ -70,7 +70,7 @@ final class SubmissionNormalizerTest extends TestCase
     #[DataProvider('phones')]
     public function testFrenchPhoneIsNormalizedToInternationalFormatOrFlagged(?string $raw, ?string $expected, ?Anomaly $anomaly): void
     {
-        $normalized = (new SubmissionNormalizer())->normalize(self::submission(['phone' => $raw]));
+        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission(['phone' => $raw]));
 
         self::assertSame($expected, $normalized->phone);
         self::assertEquals(null === $anomaly ? [] : [$anomaly], $normalized->anomalies);
@@ -94,7 +94,7 @@ final class SubmissionNormalizerTest extends TestCase
     public function testBirthDateIsReadOrFlagged(mixed $raw, ?string $expected, ?Anomaly $anomaly): void
     {
         // Submitted on 2026-09-14.
-        $normalized = (new SubmissionNormalizer())->normalize(self::submission(['birth_date' => $raw]));
+        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission(['birth_date' => $raw]));
 
         self::assertSame($expected, $normalized->birthDate?->format('Y-m-d'));
         self::assertEquals(null === $anomaly ? [] : [$anomaly], $normalized->anomalies);
@@ -116,7 +116,7 @@ final class SubmissionNormalizerTest extends TestCase
     #[DataProvider('structureTypes')]
     public function testStructureTypeOutsideTheFormListIsKeptAsOther(string $raw, Anomaly $anomaly): void
     {
-        $normalized = (new SubmissionNormalizer())->normalize(self::submission(['structure_type' => $raw]));
+        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission(['structure_type' => $raw]));
 
         self::assertSame(StructureType::Other, $normalized->structureType);
         self::assertEquals([$anomaly], $normalized->anomalies);
@@ -134,7 +134,7 @@ final class SubmissionNormalizerTest extends TestCase
 
     public function testMissingStructureNameIsFlagged(): void
     {
-        $normalized = (new SubmissionNormalizer())->normalize(self::submission(['structure_name' => null]));
+        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission(['structure_name' => null]));
 
         self::assertNull($normalized->structureName);
         self::assertEquals([new Anomaly('structure_name', AnomalyCode::Missing, null)], $normalized->anomalies);
@@ -142,7 +142,7 @@ final class SubmissionNormalizerTest extends TestCase
 
     public function testMissingNameIsFlagged(): void
     {
-        $normalized = (new SubmissionNormalizer())->normalize(self::submission(['last_name' => null]));
+        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission(['last_name' => null]));
 
         self::assertSame('', $normalized->lastName);
         self::assertEquals([new Anomaly('last_name', AnomalyCode::Missing, null)], $normalized->anomalies);
@@ -150,7 +150,7 @@ final class SubmissionNormalizerTest extends TestCase
 
     public function testFreeTextIsTrimmedAndBlankCommentIsDropped(): void
     {
-        $normalized = (new SubmissionNormalizer())->normalize(self::submission([
+        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission([
             'first_name' => ' Léa ',
             'last_name' => 'Martin ',
             'structure_name' => ' Lycée des Quatre-Vallées',
@@ -181,45 +181,10 @@ final class SubmissionNormalizerTest extends TestCase
      */
     public static function unreadableSubmissions(): iterable
     {
-        yield 'no id' => [self::submission(submission: ['id' => null])];
-        yield 'unknown status' => [self::submission(submission: ['status' => 'deleted'])];
-        yield 'no session' => [self::submission(['session' => null])];
-        yield 'session without id' => [self::submission(['session' => ['label' => 'Belley']])];
-        yield 'unreadable timestamp' => [self::submission(submission: ['updated_at' => 'yesterday-ish'])];
-    }
-
-    /**
-     * A submission as served by the form API (docs/api-formulaire.md), with optional overrides of its answers.
-     *
-     * @param array<string, mixed> $answers
-     * @param array<string, mixed> $submission
-     *
-     * @return array<string, mixed>
-     */
-    public static function submission(array $answers = [], array $submission = []): array
-    {
-        return array_replace([
-            'id' => 'sub_k3m9qz7tpe',
-            'status' => 'submitted',
-            'created_at' => '2026-09-14T07:29:00Z',
-            'updated_at' => '2026-09-14T07:29:00Z',
-            'answers' => array_replace([
-                'first_name' => 'Léa',
-                'last_name' => 'Martin',
-                'email' => 'lea.martin@example.com',
-                'phone' => '06 39 98 12 34',
-                'birth_date' => '2009-05-21',
-                'structure_type' => 'lycee',
-                'structure_name' => 'Lycée des Quatre-Vallées',
-                'session' => [
-                    'id' => 'ses_01',
-                    'label' => 'Bourg-en-Bresse — 17 novembre',
-                    'date' => '2026-11-17',
-                    'location' => 'Espace des métiers, Bourg-en-Bresse',
-                    'capacity' => 80,
-                ],
-                'comment' => null,
-            ], $answers),
-        ], $submission);
+        yield 'no id' => [Submissions::submission(submission: ['id' => null])];
+        yield 'unknown status' => [Submissions::submission(submission: ['status' => 'deleted'])];
+        yield 'no session' => [Submissions::submission(['session' => null])];
+        yield 'session without id' => [Submissions::submission(['session' => ['label' => 'Belley']])];
+        yield 'unreadable timestamp' => [Submissions::submission(submission: ['updated_at' => 'yesterday-ish'])];
     }
 }

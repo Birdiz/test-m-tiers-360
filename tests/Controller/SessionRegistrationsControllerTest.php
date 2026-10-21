@@ -4,7 +4,7 @@ namespace App\Tests\Controller;
 
 use App\Import\RegistrationImporter;
 use App\Tests\Import\FakeFormApi;
-use App\Tests\Import\SubmissionNormalizerTest;
+use App\Tests\Import\Submissions;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -22,7 +22,7 @@ final class SessionRegistrationsControllerTest extends WebTestCase
         self::getContainer()->get(Connection::class)
             ->executeStatement('TRUNCATE registration, session, operation, import_run RESTART IDENTITY CASCADE');
         self::getContainer()->get(FakeFormApi::class)->serve([
-            SubmissionNormalizerTest::submission(['comment' => "Besoin d'un accès PMR."]),
+            Submissions::submission(['comment' => "Besoin d'un accès PMR."]),
         ]);
         self::getContainer()->get(RegistrationImporter::class)->run();
     }

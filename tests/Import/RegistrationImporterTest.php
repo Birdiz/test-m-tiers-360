@@ -113,7 +113,7 @@ final class RegistrationImporterTest extends ImportTestCase
 
     public function testUnreadableSubmissionMakesTheRunIncompleteSoNothingIsRemoved(): void
     {
-        $submissions = self::dataset('submissions-v1.json');
+        $submissions = Submissions::dataset('submissions-v1.json');
         $this->formApi()->serve($submissions);
         $this->runImport();
         $submissions[0]['answers']['session'] = null;
@@ -134,7 +134,7 @@ final class RegistrationImporterTest extends ImportTestCase
         // 293, but page 3 now starts one submission later, so one is never read.
         $this->formApi()->changeAfterPage(2, static fn (array $submissions): array => [
             ...\array_slice($submissions, 1),
-            SubmissionNormalizerTest::submission(submission: ['id' => 'sub_newcomer', 'created_at' => '2026-10-20T10:00:00Z']),
+            Submissions::submission(submission: ['id' => 'sub_newcomer', 'created_at' => '2026-10-20T10:00:00Z']),
         ]);
 
         $run = $this->runImport();
@@ -149,23 +149,15 @@ final class RegistrationImporterTest extends ImportTestCase
 
     public function testOlderVersionThanTheOneKnownIsIgnored(): void
     {
-        $submission = SubmissionNormalizerTest::submission(submission: ['status' => 'cancelled', 'updated_at' => '2026-10-02T09:00:00Z']);
+        $submission = Submissions::submission(submission: ['status' => 'cancelled', 'updated_at' => '2026-10-02T09:00:00Z']);
         $this->formApi()->serve([$submission]);
         $this->runImport();
         // A stale copy (cache, replica): still submitted, last modified before the cancellation.
-        $this->formApi()->serve([SubmissionNormalizerTest::submission(submission: ['updated_at' => '2026-09-20T09:00:00Z'])]);
+        $this->formApi()->serve([Submissions::submission(submission: ['updated_at' => '2026-09-20T09:00:00Z'])]);
 
         $run = $this->runImport();
 
         self::assertSame(ImportRunStatus::Completed, $run->getStatus());
         self::assertSame([0, 1], [$this->roster('ses_01')->summary->active, $this->roster('ses_01')->summary->cancelled]);
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private static function dataset(string $file): array
-    {
-        return json_decode((string) file_get_contents(\dirname(__DIR__, 2).'/mock-api/data/'.$file), true, flags: \JSON_THROW_ON_ERROR)['submissions'];
     }
 }
