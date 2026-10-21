@@ -2,6 +2,7 @@
 
 namespace App\Roster;
 
+use App\Entity\ImportRunStatus;
 use App\Entity\StructureType;
 
 final readonly class RosterSummary
@@ -23,6 +24,11 @@ final readonly class RosterSummary
         public array $ages,
         public int $unreachable,
         public array $toReview,
+        /** When the data was last fully in sync with the source. */
+        public ?\DateTimeImmutable $dataAsOf,
+        /** A failed or incomplete last run means the data may be stale. */
+        public ?ImportRunStatus $lastRunStatus,
+        public ?\DateTimeImmutable $lastRunAt,
     ) {
     }
 }

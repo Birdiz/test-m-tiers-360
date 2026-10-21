@@ -2,15 +2,19 @@
 
 namespace App\Tests\Import;
 
+use App\Entity\ImportRunStatus;
 use App\Entity\StructureType;
 use App\Roster\ReviewReason;
 use App\Roster\RosterEntry;
+use Symfony\Component\Clock\Test\ClockSensitiveTrait;
 
 /**
  * Seam S1, read side: what the ops team sees for a session after an import.
  */
 final class SessionRosterTest extends ImportTestCase
 {
+    use ClockSensitiveTrait;
+
     public function testActiveRegistrationsAreRankedFirstComeFirstServedAgainstCapacity(): void
     {
         $this->formApi()->serve([
@@ -138,6 +142,22 @@ final class SessionRosterTest extends ImportTestCase
             ['type' => StructureType::Lycee, 'name' => 'Lycée des Quatre-Vallées', 'count' => 2],
             ['type' => StructureType::MissionLocale, 'name' => 'Mission locale de Belley', 'count' => 1],
         ], $this->roster('ses_01')->summary->byStructure);
+    }
+
+    public function testDataIsAsOfTheLastCompleteRunAndAFailedRunShows(): void
+    {
+        self::mockTime('2026-10-20 06:00:00');
+        $this->formApi()->serve([self::registration('sub_a', '2026-09-01T10:00:00Z')]);
+        $this->runImport();
+        self::mockTime('2026-10-20 07:00:00');
+        $this->formApi()->script(1, ...array_fill(0, 4, FakeFormApi::serverError()));
+        $this->runImport();
+
+        $summary = $this->roster('ses_01')->summary;
+
+        self::assertSame('2026-10-20 06:00:00', $summary->dataAsOf?->format('Y-m-d H:i:s'));
+        self::assertSame(ImportRunStatus::Failed, $summary->lastRunStatus);
+        self::assertSame('2026-10-20 07:00:00', $summary->lastRunAt?->format('Y-m-d H:i:s'));
     }
 
     /**

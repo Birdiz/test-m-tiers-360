@@ -2,6 +2,7 @@
 
 namespace App\Roster;
 
+use App\Entity\ImportRun;
 use App\Entity\Registration;
 use App\Entity\RegistrationStatus;
 use App\Entity\Session;
@@ -26,7 +27,7 @@ final readonly class Roster
      * @param list<Registration> $registrations every registration of the session, oldest first
      * @param list<Registration> $elsewhere     active registrations of other sessions sharing an email with this one
      */
-    public static function of(Session $session, array $registrations, array $elsewhere): self
+    public static function of(Session $session, array $registrations, array $elsewhere, ?ImportRun $lastRun, ?ImportRun $lastCompletedRun): self
     {
         $active = array_values(array_filter($registrations, static fn (Registration $r): bool => $r->isActive()));
         $capacity = $session->getCapacity();
@@ -90,6 +91,9 @@ final readonly class Roster
                 1,
                 0,
             ),
+            dataAsOf: $lastCompletedRun?->getFinishedAt(),
+            lastRunStatus: $lastRun?->getStatus(),
+            lastRunAt: $lastRun?->getFinishedAt(),
         ), $entries);
     }
 

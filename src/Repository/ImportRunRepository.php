@@ -29,4 +29,14 @@ class ImportRunRepository extends ServiceEntityRepository
             ->getQuery()
             ->getOneOrNullResult();
     }
+
+    public function lastFinished(): ?ImportRun
+    {
+        return $this->findOneBy(['status' => [ImportRunStatus::Completed, ImportRunStatus::Incomplete, ImportRunStatus::Failed]], ['id' => 'DESC']);
+    }
+
+    public function lastCompleted(): ?ImportRun
+    {
+        return $this->findOneBy(['status' => ImportRunStatus::Completed], ['id' => 'DESC']);
+    }
 }
