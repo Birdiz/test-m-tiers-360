@@ -28,6 +28,7 @@ final readonly class Roster
         return new self($session, new RosterSummary(
             active: \count($active),
             cancelled: \count($cancelled),
+            removed: \count(array_filter($registrations, static fn (Registration $r): bool => $r->isRemoved())),
         ));
     }
 }
