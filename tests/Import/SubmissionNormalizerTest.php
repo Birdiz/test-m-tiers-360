@@ -66,6 +66,52 @@ final class SubmissionNormalizerTest extends TestCase
         self::assertEquals([new Anomaly('email', AnomalyCode::Missing, null)], $normalized->anomalies);
     }
 
+    #[DataProvider('phones')]
+    public function testFrenchPhoneIsNormalizedToInternationalFormatOrFlagged(?string $raw, ?string $expected, ?Anomaly $anomaly): void
+    {
+        $normalized = (new SubmissionNormalizer())->normalize(self::submission(['phone' => $raw]));
+
+        self::assertSame($expected, $normalized->phone);
+        self::assertEquals(null === $anomaly ? [] : [$anomaly], $normalized->anomalies);
+    }
+
+    /**
+     * @return iterable<string, array{?string, ?string, ?Anomaly}>
+     */
+    public static function phones(): iterable
+    {
+        yield 'international with spaces' => ['+33 6 12 34 56 78', '+33612345678', null];
+        yield 'dots' => ['06.12.34.56.78', '+33612345678', null];
+        yield 'spaces' => ['07 12 34 56 78', '+33712345678', null];
+        yield 'digits only' => ['0612345678', '+33612345678', null];
+        yield 'not given (optional)' => [null, null, null];
+        yield 'blank (optional)' => ['  ', null, null];
+        yield 'too short' => ['12 34', null, new Anomaly('phone', AnomalyCode::Invalid, '12 34')];
+    }
+
+    #[DataProvider('birthDates')]
+    public function testBirthDateIsReadOrFlagged(mixed $raw, ?string $expected, ?Anomaly $anomaly): void
+    {
+        // Submitted on 2026-09-14.
+        $normalized = (new SubmissionNormalizer())->normalize(self::submission(['birth_date' => $raw]));
+
+        self::assertSame($expected, $normalized->birthDate?->format('Y-m-d'));
+        self::assertEquals(null === $anomaly ? [] : [$anomaly], $normalized->anomalies);
+    }
+
+    /**
+     * @return iterable<string, array{mixed, ?string, ?Anomaly}>
+     */
+    public static function birthDates(): iterable
+    {
+        yield 'French day/month/year' => ['12/03/2008', '2008-03-12', null];
+        yield 'more than 100 years before submitting' => ['1900-01-01', null, new Anomaly('birth_date', AnomalyCode::Implausible, '1900-01-01')];
+        yield 'after the submission' => ['2031-04-02', null, new Anomaly('birth_date', AnomalyCode::Implausible, '2031-04-02')];
+        yield 'impossible day' => ['2009-02-30', null, new Anomaly('birth_date', AnomalyCode::Invalid, '2009-02-30')];
+        yield 'free text' => ['mai 2009', null, new Anomaly('birth_date', AnomalyCode::Invalid, 'mai 2009')];
+        yield 'missing' => [null, null, new Anomaly('birth_date', AnomalyCode::Missing, null)];
+    }
+
     /**
      * A submission as served by the form API (docs/api-formulaire.md), with optional overrides of its answers.
      *
