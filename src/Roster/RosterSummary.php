@@ -8,6 +8,8 @@ final readonly class RosterSummary
         public int $active,
         public int $cancelled,
         public int $removed,
+        public int $remainingSeats,
+        public int $overbookedBy,
     ) {
     }
 }
