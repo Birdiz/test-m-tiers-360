@@ -19,14 +19,11 @@ class ImportRunRepository extends ServiceEntityRepository
 
     public function lastCompletedBefore(ImportRun $run): ?ImportRun
     {
-        return $this->createQueryBuilder('r')
-            ->where('r.status = :completed')
-            ->andWhere('r.id < :run')
+        return $this->getEntityManager()
+            ->createQuery('SELECT r FROM '.ImportRun::class.' r WHERE r.status = :completed AND r.id < :run ORDER BY r.id DESC')
             ->setParameter('completed', ImportRunStatus::Completed)
             ->setParameter('run', $run->getId())
-            ->orderBy('r.id', 'DESC')
             ->setMaxResults(1)
-            ->getQuery()
             ->getOneOrNullResult();
     }
 

@@ -5,8 +5,9 @@ Pour voir facilement qu'un import a échoué, sans ajouter d'outil :
   sort en code 1 quand la source a échoué : cron sait déjà envoyer ou journaliser cela ;
 - chaque passage est conservé avec son statut, ses compteurs, sa raison et les réponses illisibles ;
   `app:inscriptions:runs` les affiche, et la synthèse d'une session dit si le dernier passage a échoué ;
-- les journaux passent par le logger intégré de Symfony vers la sortie d'erreur (`docker compose logs`) :
-  erreur sur un échec, avertissement sur une réponse illisible ou un passage incomplet, info sur une relance.
+- les journaux passent par le logger intégré de Symfony vers la sortie d'erreur (`docker compose logs`, cron) :
+  erreur sur un échec, avertissement sur une réponse illisible ou un passage incomplet, notice sur une relance.
+  Son niveau est fixé par `LOG_LEVEL` (`notice` par défaut) : sans cela, il n'écrit que les erreurs.
 
 ## Considered Options
 

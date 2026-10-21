@@ -80,7 +80,7 @@ final class FormApi
 
             $delayMs = is_numeric($retryAfter) ? (int) $retryAfter * 1000 : $this->retryDelayMs * 2 ** $attempt;
             $delayMs = min($delayMs, self::MAX_DELAY_MS);
-            $this->logger->info('Retrying page {page} in {delay} ms ({reason})', ['page' => $page, 'delay' => $delayMs, 'reason' => $reason]);
+            $this->logger->notice('Retrying page {page} in {delay} ms ({reason})', ['page' => $page, 'delay' => $delayMs, 'reason' => $reason]);
             usleep($delayMs * 1000);
         }
     }

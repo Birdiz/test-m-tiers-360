@@ -20,6 +20,12 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
+    # Symfony's built-in logger, to stderr (docker compose logs, cron), at an explicit level: by default it only
+    # shows errors, which would hide retries and unreadable submissions (ADR 0012).
+    logger:
+        class: Symfony\Component\HttpKernel\Log\Logger
+        arguments: ['%env(LOG_LEVEL)%', 'php://stderr']
+
     App\Import\FormApi:
         arguments:
             $maxRetries: 3
