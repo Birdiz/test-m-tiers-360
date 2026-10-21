@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Import\Anomaly;
+use App\Import\AnomalyCode;
 use App\Import\NormalizedSubmission;
 use App\Repository\RegistrationRepository;
 use Doctrine\DBAL\Types\Types;
@@ -136,10 +137,7 @@ class Registration
         $this->structureType = $submission->structureType;
         $this->structureName = $submission->structureName;
         $this->comment = $submission->comment;
-        $this->anomalies = array_map(
-            static fn (Anomaly $anomaly): array => ['field' => $anomaly->field, 'code' => $anomaly->code->value, 'raw' => $anomaly->raw],
-            $submission->anomalies,
-        );
+        $this->anomalies = array_map(static fn (Anomaly $anomaly): array => $anomaly->jsonSerialize(), $submission->anomalies);
     }
 
     /**
@@ -157,6 +155,14 @@ class Registration
     public function personKey(): ?string
     {
         return null === $this->email ? null : implode('|', [$this->email, mb_strtolower($this->firstName), $this->birthDate?->format('Y-m-d')]);
+    }
+
+    /**
+     * Neither a valid email nor a phone: nobody can send a reminder or a cancellation.
+     */
+    public function isUnreachable(): bool
+    {
+        return null === $this->email && null === $this->phone;
     }
 
     public function isRemoved(): bool
@@ -225,10 +231,13 @@ class Registration
     }
 
     /**
-     * @return list<array{field: string, code: string, raw: ?string}>
+     * @return list<Anomaly>
      */
     public function getAnomalies(): array
     {
-        return $this->anomalies;
+        return array_map(
+            static fn (array $anomaly): Anomaly => new Anomaly($anomaly['field'], AnomalyCode::from($anomaly['code']), $anomaly['raw']),
+            $this->anomalies,
+        );
     }
 }

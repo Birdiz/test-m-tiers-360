@@ -3,6 +3,7 @@
 namespace App\Roster;
 
 use App\Entity\StructureType;
+use App\Import\Anomaly;
 
 /**
  * An active registration as the ops team reads it.
@@ -10,8 +11,8 @@ use App\Entity\StructureType;
 final readonly class RosterEntry implements \JsonSerializable
 {
     /**
-     * @param list<array{field: string, code: string, raw: ?string}> $anomalies
-     * @param list<ReviewReason>                                      $reviewReasons
+     * @param list<Anomaly>      $anomalies
+     * @param list<ReviewReason> $reviewReasons
      */
     public function __construct(
         public string $externalId,
@@ -28,6 +29,8 @@ final readonly class RosterEntry implements \JsonSerializable
         public ?string $comment,
         public array $anomalies,
         public array $reviewReasons,
+        /** A probable duplicate of an entry ranked before it: not one more person. */
+        public bool $isRepeat,
     ) {
     }
 

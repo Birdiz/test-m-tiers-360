@@ -29,7 +29,7 @@ final class SessionRoster
         return Roster::of(
             $session,
             $registrations,
-            $this->registrations->findActiveElsewhere($session, $emails),
+            $this->registrations->findInOtherSessionsByEmails($session, $emails),
             $this->runs->lastFinished(),
             $this->runs->lastCompleted(),
         );

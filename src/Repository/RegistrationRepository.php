@@ -5,7 +5,6 @@ namespace App\Repository;
 use App\Entity\ImportRun;
 use App\Entity\Operation;
 use App\Entity\Registration;
-use App\Entity\RegistrationStatus;
 use App\Entity\Session;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -74,24 +73,21 @@ class RegistrationRepository extends ServiceEntityRepository
     }
 
     /**
-     * Active registrations of the session's operation, in other sessions, for these emails.
+     * Registrations of the session's operation, in other sessions, for these emails.
      *
      * @param list<string> $emails
      *
      * @return list<Registration>
      */
-    public function findActiveElsewhere(Session $session, array $emails): array
+    public function findInOtherSessionsByEmails(Session $session, array $emails): array
     {
         return $this->createQueryBuilder('r')
             ->where('r.operation = :operation')
             ->andWhere('r.session <> :session')
             ->andWhere('r.email IN (:emails)')
-            ->andWhere('r.status = :submitted')
-            ->andWhere('r.removedAt IS NULL')
             ->setParameter('operation', $session->getOperation())
             ->setParameter('session', $session)
             ->setParameter('emails', $emails)
-            ->setParameter('submitted', RegistrationStatus::Submitted)
             ->getQuery()
             ->getResult();
     }

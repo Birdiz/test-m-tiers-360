@@ -25,40 +25,69 @@ final readonly class Roster implements \JsonSerializable
 
     /**
      * @param list<Registration> $registrations every registration of the session, in queue order
-     * @param list<Registration> $elsewhere     active registrations of other sessions sharing an email with this one
+     * @param list<Registration> $elsewhere     registrations of other sessions sharing an email with this one
      */
     public static function of(Session $session, array $registrations, array $elsewhere, ?ImportRun $lastRun, ?ImportRun $lastCompletedRun): self
     {
         $active = array_values(array_filter($registrations, static fn (Registration $r): bool => $r->isActive()));
-        $capacity = $session->getCapacity();
+        $entries = self::entries($session, $active, array_values(array_filter($elsewhere, static fn (Registration $r): bool => $r->isActive())));
 
+        $toReview = [];
+        foreach ($entries as $entry) {
+            if ([] !== $entry->reviewReasons) {
+                $toReview[$entry->externalId] = $entry->reviewReasons;
+            }
+        }
+        $ages = array_map(static fn (RosterEntry $e): ?int => $e->age, $entries);
+
+        return new self($session, new RosterSummary(
+            active: \count($active),
+            cancelled: \count(array_filter($registrations, static fn (Registration $r): bool => !$r->isRemoved() && RegistrationStatus::Cancelled === $r->getStatus())),
+            removed: \count(array_filter($registrations, static fn (Registration $r): bool => $r->isRemoved())),
+            estimatedPeople: \count($active) - \count(array_filter($entries, static fn (RosterEntry $e): bool => $e->isRepeat)),
+            remainingSeats: max(0, $session->getCapacity() - \count($active)),
+            overbookedBy: max(0, \count($active) - $session->getCapacity()),
+            byStructure: self::byStructure($active),
+            ages: [
+                'minors' => \count(array_filter($ages, static fn (?int $age): bool => null !== $age && $age < 18)),
+                'adults' => \count(array_filter($ages, static fn (?int $age): bool => null !== $age && $age >= 18)),
+                'unknown' => \count(array_filter($ages, static fn (?int $age): bool => null === $age)),
+            ],
+            unreachable: \count(array_filter($active, static fn (Registration $r): bool => $r->isUnreachable())),
+            toReview: $toReview,
+            dataAsOf: $lastCompletedRun?->getFinishedAt(),
+            lastRunStatus: $lastRun?->getStatus(),
+            lastRunAt: $lastRun?->getFinishedAt(),
+        ), $entries);
+    }
+
+    /**
+     * @param list<Registration> $active          active registrations of the session, in queue order
+     * @param list<Registration> $activeElsewhere active registrations of other sessions sharing an email
+     *
+     * @return list<RosterEntry>
+     */
+    private static function entries(Session $session, array $active, array $activeElsewhere): array
+    {
         $peopleHere = array_count_values(array_filter(array_map(static fn (Registration $r): ?string => $r->personKey(), $active)));
-        $peopleElsewhere = array_flip(array_filter(array_map(static fn (Registration $r): ?string => $r->personKey(), $elsewhere)));
+        $peopleElsewhere = array_flip(array_filter(array_map(static fn (Registration $r): ?string => $r->personKey(), $activeElsewhere)));
+        $alreadyListed = [];
 
         $entries = [];
         foreach ($active as $index => $registration) {
             $person = $registration->personKey();
-            $reasons = [];
-            if (null !== $person && $peopleHere[$person] > 1) {
-                $reasons[] = ReviewReason::ProbableDuplicate;
-            }
-            if (null !== $person && isset($peopleElsewhere[$person])) {
-                $reasons[] = ReviewReason::OtherSession;
-            }
-            if (null === $registration->getEmail() && null === $registration->getPhone()) {
-                $reasons[] = ReviewReason::Unreachable;
-            }
-            if ([] !== $registration->getAnomalies()) {
-                $reasons[] = ReviewReason::Anomaly;
-            }
-            if (null !== $registration->getComment()) {
-                $reasons[] = ReviewReason::Comment;
-            }
+            $reasons = array_values(array_filter([
+                null !== $person && $peopleHere[$person] > 1 ? ReviewReason::ProbableDuplicate : null,
+                null !== $person && isset($peopleElsewhere[$person]) ? ReviewReason::OtherSession : null,
+                $registration->isUnreachable() ? ReviewReason::Unreachable : null,
+                [] !== $registration->getAnomalies() ? ReviewReason::Anomaly : null,
+                null !== $registration->getComment() ? ReviewReason::Comment : null,
+            ]));
 
             $entries[] = new RosterEntry(
                 externalId: $registration->getExternalId(),
                 rank: $index + 1,
-                beyondCapacity: $index + 1 > $capacity,
+                beyondCapacity: $index + 1 > $session->getCapacity(),
                 firstName: $registration->getFirstName(),
                 lastName: $registration->getLastName(),
                 email: $registration->getEmail(),
@@ -69,32 +98,14 @@ final readonly class Roster implements \JsonSerializable
                 comment: $registration->getComment(),
                 anomalies: $registration->getAnomalies(),
                 reviewReasons: $reasons,
+                isRepeat: null !== $person && isset($alreadyListed[$person]),
             );
+            if (null !== $person) {
+                $alreadyListed[$person] = true;
+            }
         }
 
-        return new self($session, new RosterSummary(
-            active: \count($active),
-            cancelled: \count(array_filter($registrations, static fn (Registration $r): bool => !$r->isRemoved() && RegistrationStatus::Cancelled === $r->getStatus())),
-            removed: \count(array_filter($registrations, static fn (Registration $r): bool => $r->isRemoved())),
-            estimatedPeople: \count($active) - array_sum(array_map(static fn (int $count): int => $count - 1, $peopleHere)),
-            remainingSeats: max(0, $capacity - \count($active)),
-            overbookedBy: max(0, \count($active) - $capacity),
-            byStructure: self::byStructure($active),
-            ages: [
-                'minors' => \count(array_filter($entries, static fn (RosterEntry $e): bool => null !== $e->age && $e->age < 18)),
-                'adults' => \count(array_filter($entries, static fn (RosterEntry $e): bool => null !== $e->age && $e->age >= 18)),
-                'unknown' => \count(array_filter($entries, static fn (RosterEntry $e): bool => null === $e->age)),
-            ],
-            unreachable: \count(array_filter($entries, static fn (RosterEntry $e): bool => \in_array(ReviewReason::Unreachable, $e->reviewReasons, true))),
-            toReview: array_column(
-                array_map(static fn (RosterEntry $e): array => [$e->externalId, $e->reviewReasons], array_filter($entries, static fn (RosterEntry $e): bool => [] !== $e->reviewReasons)),
-                1,
-                0,
-            ),
-            dataAsOf: $lastCompletedRun?->getFinishedAt(),
-            lastRunStatus: $lastRun?->getStatus(),
-            lastRunAt: $lastRun?->getFinishedAt(),
-        ), $entries);
+        return $entries;
     }
 
     /**
