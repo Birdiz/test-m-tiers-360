@@ -2,6 +2,7 @@
 
 namespace App\Roster;
 
+use App\Entity\Registration;
 use App\Repository\RegistrationRepository;
 use App\Repository\SessionRepository;
 
@@ -16,7 +17,13 @@ final class SessionRoster
     public function forSession(string $sessionExternalId): ?Roster
     {
         $session = $this->sessions->findOneBy(['externalId' => $sessionExternalId]);
+        if (null === $session) {
+            return null;
+        }
 
-        return null === $session ? null : Roster::of($session, $this->registrations->findBySession($session));
+        $registrations = $this->registrations->findBySession($session);
+        $emails = array_values(array_unique(array_filter(array_map(static fn (Registration $r): ?string => $r->getEmail(), $registrations))));
+
+        return Roster::of($session, $registrations, $this->registrations->findActiveElsewhere($session, $emails));
     }
 }

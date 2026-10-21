@@ -131,6 +131,15 @@ class Registration
         return RegistrationStatus::Submitted === $this->status && null === $this->removedAt;
     }
 
+    /**
+     * Identifies the person behind a registration, as far as the source allows: same email, first name and birth
+     * date. Never the email alone, siblings share one (ADR 0001). Null without an email.
+     */
+    public function personKey(): ?string
+    {
+        return null === $this->email ? null : implode('|', [$this->email, mb_strtolower($this->firstName), $this->birthDate?->format('Y-m-d')]);
+    }
+
     public function isRemoved(): bool
     {
         return null !== $this->removedAt;
