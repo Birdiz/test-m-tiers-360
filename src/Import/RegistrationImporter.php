@@ -6,6 +6,7 @@ use App\Entity\ImportRun;
 use App\Entity\Operation;
 use App\Entity\Registration;
 use App\Entity\Session;
+use App\Repository\ImportRunRepository;
 use App\Repository\RegistrationRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
@@ -14,7 +15,7 @@ use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 
 /**
  * One import run: reads every page of the source, applies each page in its own transaction, and removes
- * what the source no longer has only when the run saw the whole source (ADRs 0002, 0009).
+ * what two complete runs in a row did not find in the source (ADRs 0002, 0009).
  *
  * Never throws on a source failure: the returned run says how it ended.
  */
@@ -25,6 +26,7 @@ final class RegistrationImporter
         private readonly SubmissionNormalizer $normalizer,
         private readonly EntityManagerInterface $entityManager,
         private readonly RegistrationRepository $registrations,
+        private readonly ImportRunRepository $runs,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
     ) {
@@ -57,7 +59,10 @@ final class RegistrationImporter
         if (null === $operation || $totalChanged || $seen !== $total) {
             $run->endIncomplete(\sprintf('Saw %d registrations, the source announced %s.', $seen, $totalChanged ? 'a changing total' : $total), $this->clock->now());
         } else {
-            $removed = $this->registrations->removeNotSeenIn($operation, $run, $this->clock->now());
+            // The count cannot catch a deletion and an insertion that cancel out while pages shift: a registration
+            // skipped that way is only removed if the previous complete run missed it too (ADR 0002).
+            $previous = $this->runs->lastCompletedBefore($run);
+            $removed = null === $previous ? 0 : $this->registrations->removeNotSeenSince($operation, $previous, $this->clock->now());
             $run->complete($removed, $this->clock->now());
         }
         $this->entityManager->flush();

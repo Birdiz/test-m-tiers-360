@@ -41,13 +41,30 @@ final class RegistrationImporterTest extends ImportTestCase
 
         // v1 → v2: 12 new, 11 edited (7 cancelled, 3 moved from ses_02 to ses_03, 1 renamed), 2 gone.
         self::assertSame(ImportRunStatus::Completed, $run->getStatus());
-        self::assertSame([12, 11, 2], [$run->getCreated(), $run->getUpdated(), $run->getRemoved()]);
+        self::assertSame([12, 11, 0], [$run->getCreated(), $run->getUpdated(), $run->getRemoved()]);
+        // A registration is removed once missing from two complete runs in a row (ADR 0002).
+        self::assertSame(2, $this->runImport()->getRemoved());
         $summaries = array_map(fn (string $id): array => [
             $this->roster($id)->summary->active,
             $this->roster($id)->summary->cancelled,
             $this->roster($id)->summary->removed,
         ], ['ses_01', 'ses_02', 'ses_03', 'ses_04']);
         self::assertSame([[78, 5, 1], [53, 1, 1], [49, 2, 0], [109, 6, 0]], $summaries);
+    }
+
+    public function testRemovedRegistrationThatComesBackIsActiveAgain(): void
+    {
+        $this->formApi()->serveDataset('submissions-v1.json');
+        $this->runImport();
+        $this->formApi()->serveDataset('submissions-v2.json');
+        $this->runImport();
+        $this->runImport();
+        $this->formApi()->serveDataset('submissions-v1.json');
+
+        $this->runImport();
+
+        // sub_5m3rfhnkfb (ses_01), removed after two v2 runs, is back in the source.
+        self::assertSame(0, $this->roster('ses_01')->summary->removed);
     }
 
     public function testServerErrorAndSlowPageAreRetried(): void
@@ -92,5 +109,63 @@ final class RegistrationImporterTest extends ImportTestCase
 
         self::assertSame(ImportRunStatus::Failed, $run->getStatus());
         self::assertSame([1], $this->formApi()->requestedPages());
+    }
+
+    public function testUnreadableSubmissionMakesTheRunIncompleteSoNothingIsRemoved(): void
+    {
+        $submissions = self::dataset('submissions-v1.json');
+        $this->formApi()->serve($submissions);
+        $this->runImport();
+        $submissions[0]['answers']['session'] = null;
+        $this->formApi()->serve(\array_slice($submissions, 0, 50));
+
+        $run = $this->runImport();
+
+        self::assertSame(ImportRunStatus::Incomplete, $run->getStatus());
+        self::assertSame([49, 1, 0], [$run->getSeen(), $run->getUnreadable(), $run->getRemoved()]);
+    }
+
+    public function testRegistrationSkippedByAPageShiftIsNotRemoved(): void
+    {
+        $this->formApi()->serveDataset('submissions-v1.json');
+        $this->runImport();
+        $this->runImport();
+        // After page 2 is read, one submission of page 1 is deleted and a new one arrives: the total stays at
+        // 293, but page 3 now starts one submission later, so one is never read.
+        $this->formApi()->changeAfterPage(2, static fn (array $submissions): array => [
+            ...\array_slice($submissions, 1),
+            SubmissionNormalizerTest::submission(submission: ['id' => 'sub_newcomer', 'created_at' => '2026-10-20T10:00:00Z']),
+        ]);
+
+        $run = $this->runImport();
+
+        // Seen 293 = total announced, yet one registration still in the source was skipped: the count alone
+        // cannot tell. It is not removed, because it was seen in the previous complete run.
+        self::assertSame(ImportRunStatus::Completed, $run->getStatus());
+        self::assertSame(0, $run->getRemoved());
+        self::assertSame(0, $this->roster('ses_01')->summary->removed + $this->roster('ses_02')->summary->removed
+            + $this->roster('ses_03')->summary->removed + $this->roster('ses_04')->summary->removed);
+    }
+
+    public function testOlderVersionThanTheOneKnownIsIgnored(): void
+    {
+        $submission = SubmissionNormalizerTest::submission(submission: ['status' => 'cancelled', 'updated_at' => '2026-10-02T09:00:00Z']);
+        $this->formApi()->serve([$submission]);
+        $this->runImport();
+        // A stale copy (cache, replica): still submitted, last modified before the cancellation.
+        $this->formApi()->serve([SubmissionNormalizerTest::submission(submission: ['updated_at' => '2026-09-20T09:00:00Z'])]);
+
+        $run = $this->runImport();
+
+        self::assertSame(ImportRunStatus::Completed, $run->getStatus());
+        self::assertSame([0, 1], [$this->roster('ses_01')->summary->active, $this->roster('ses_01')->summary->cancelled]);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private static function dataset(string $file): array
+    {
+        return json_decode((string) file_get_contents(\dirname(__DIR__, 2).'/mock-api/data/'.$file), true, flags: \JSON_THROW_ON_ERROR)['submissions'];
     }
 }

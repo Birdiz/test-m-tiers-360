@@ -48,17 +48,19 @@ class RegistrationRepository extends ServiceEntityRepository
     }
 
     /**
+     * Removes what no run has seen since before $previous, i.e. what both $previous and the current run missed.
+     *
      * @return int how many registrations were removed
      */
-    public function removeNotSeenIn(Operation $operation, ImportRun $run, \DateTimeImmutable $at): int
+    public function removeNotSeenSince(Operation $operation, ImportRun $previous, \DateTimeImmutable $at): int
     {
         return (int) $this->getEntityManager()->createQuery(
             'UPDATE '.Registration::class.' r SET r.removedAt = :at
-             WHERE r.operation = :operation AND r.lastSeenRunId <> :run AND r.removedAt IS NULL',
+             WHERE r.operation = :operation AND r.lastSeenRunId < :previous AND r.removedAt IS NULL',
         )
             ->setParameter('at', $at)
             ->setParameter('operation', $operation)
-            ->setParameter('run', $run->getId())
+            ->setParameter('previous', $previous->getId())
             ->execute();
     }
 

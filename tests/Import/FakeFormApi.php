@@ -24,6 +24,9 @@ final class FakeFormApi
     /** @var list<int> */
     private array $requestedPages = [];
 
+    /** @var array<int, \Closure(list<array<string, mixed>>): list<array<string, mixed>>> */
+    private array $changesAfterPage = [];
+
     /**
      * @param list<array<string, mixed>> $submissions
      */
@@ -49,6 +52,16 @@ final class FakeFormApi
     public function script(int $page, MockResponse ...$responses): void
     {
         $this->scripted[$page] = [...($this->scripted[$page] ?? []), ...$responses];
+    }
+
+    /**
+     * Changes the source right after this page is served, to simulate edits made during a run.
+     *
+     * @param \Closure(list<array<string, mixed>>): list<array<string, mixed>> $change
+     */
+    public function changeAfterPage(int $page, \Closure $change): void
+    {
+        $this->changesAfterPage[$page] = $change;
     }
 
     /**
@@ -86,7 +99,7 @@ final class FakeFormApi
             return array_shift($this->scripted[$page]);
         }
 
-        return new MockResponse(json_encode([
+        $response = new MockResponse(json_encode([
             'form' => $this->form,
             'data' => \array_slice($this->submissions, ($page - 1) * self::PER_PAGE, self::PER_PAGE),
             'meta' => [
@@ -96,5 +109,12 @@ final class FakeFormApi
                 'total_pages' => max(1, (int) ceil(\count($this->submissions) / self::PER_PAGE)),
             ],
         ], \JSON_THROW_ON_ERROR), ['http_code' => 200, 'response_headers' => ['content-type' => 'application/json']]);
+
+        if (isset($this->changesAfterPage[$page])) {
+            $this->submissions = ($this->changesAfterPage[$page])($this->submissions);
+            unset($this->changesAfterPage[$page]);
+        }
+
+        return $response;
     }
 }
