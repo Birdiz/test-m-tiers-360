@@ -30,7 +30,7 @@ final readonly class Roster implements \JsonSerializable
     public static function of(Session $session, array $registrations, array $elsewhere, ?ImportRun $lastRun, ?ImportRun $lastCompletedRun): self
     {
         $active = array_values(array_filter($registrations, static fn (Registration $r): bool => $r->isActive()));
-        $entries = self::entries($session, $active, array_values(array_filter($elsewhere, static fn (Registration $r): bool => $r->isActive())));
+        $entries = self::buildEntries($session, $active, array_values(array_filter($elsewhere, static fn (Registration $r): bool => $r->isActive())));
 
         $toReview = [];
         foreach ($entries as $entry) {
@@ -47,7 +47,7 @@ final readonly class Roster implements \JsonSerializable
             estimatedPeople: \count($active) - \count(array_filter($entries, static fn (RosterEntry $e): bool => $e->isRepeat)),
             remainingSeats: max(0, $session->getCapacity() - \count($active)),
             overbookedBy: max(0, \count($active) - $session->getCapacity()),
-            byStructure: self::byStructure($active),
+            byStructure: self::groupByStructure($active),
             ages: [
                 'minors' => \count(array_filter($ages, static fn (?int $age): bool => null !== $age && $age < 18)),
                 'adults' => \count(array_filter($ages, static fn (?int $age): bool => null !== $age && $age >= 18)),
@@ -67,7 +67,7 @@ final readonly class Roster implements \JsonSerializable
      *
      * @return list<RosterEntry>
      */
-    private static function entries(Session $session, array $active, array $activeElsewhere): array
+    private static function buildEntries(Session $session, array $active, array $activeElsewhere): array
     {
         $peopleHere = array_count_values(array_filter(array_map(static fn (Registration $r): ?string => $r->personKey(), $active)));
         $peopleElsewhere = array_flip(array_filter(array_map(static fn (Registration $r): ?string => $r->personKey(), $activeElsewhere)));
@@ -113,7 +113,7 @@ final readonly class Roster implements \JsonSerializable
      *
      * @return list<array{type: StructureType, name: ?string, count: int}>
      */
-    private static function byStructure(array $active): array
+    private static function groupByStructure(array $active): array
     {
         $groups = [];
         foreach ($active as $registration) {

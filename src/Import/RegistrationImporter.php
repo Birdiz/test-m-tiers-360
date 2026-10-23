@@ -117,7 +117,7 @@ final readonly class RegistrationImporter
 
     private function applyPage(SourcePage $page, ImportRun $run, int &$unmatched): Operation
     {
-        $operation = $this->operation($page);
+        $operation = $this->upsertOperation($page);
         $runId = (int) $run->getId();
 
         $submissions = [];
@@ -141,7 +141,7 @@ final readonly class RegistrationImporter
         }
 
         foreach ($submissions as $externalId => $submission) {
-            $session = $this->session($operation, $submission->session);
+            $session = $this->upsertSession($operation, $submission->session);
             $registration = $known[$externalId] ?? null;
             if (null === $registration) {
                 $this->entityManager->persist(new Registration($operation, $externalId, $submission, $session, $runId));
@@ -161,7 +161,7 @@ final readonly class RegistrationImporter
         return $operation;
     }
 
-    private function operation(SourcePage $page): Operation
+    private function upsertOperation(SourcePage $page): Operation
     {
         $operation = $this->entityManager->getRepository(Operation::class)->findOneBy(['externalFormId' => $page->formId]);
         if (null === $operation) {
@@ -174,7 +174,7 @@ final readonly class RegistrationImporter
         return $operation;
     }
 
-    private function session(Operation $operation, SessionSnapshot $snapshot): Session
+    private function upsertSession(Operation $operation, SessionSnapshot $snapshot): Session
     {
         $session = $this->entityManager->getRepository(Session::class)->findOneBy(['operation' => $operation, 'externalId' => $snapshot->externalId]);
         if (null === $session) {
