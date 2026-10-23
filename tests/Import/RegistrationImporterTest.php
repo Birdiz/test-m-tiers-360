@@ -188,7 +188,24 @@ final class RegistrationImporterTest extends ImportTestCase
 
         self::assertSame(ImportRunStatus::Incomplete, $run->getStatus());
         self::assertSame('Saw 291 submissions, the source announced 292.', $run->getReason());
+        // The run reports what it judged: the submission read twice is seen once (ADR 0013).
+        self::assertSame(291, $run->getSeen());
         self::assertSame([0, 0], [$run->getRemoved(), $this->removedEverywhere()]);
+    }
+
+    public function testUnreadableSubmissionsAreSeen(): void
+    {
+        $this->formApi()->serve([
+            Submissions::submission(),
+            Submissions::submission(['session' => null], ['id' => 'sub_nosession']),
+            Submissions::submission(submission: ['id' => null]),
+        ]);
+
+        $run = $this->runImport();
+
+        // Unreadable, but in the source: they count towards the total announced (ADR 0013).
+        self::assertSame(ImportRunStatus::Completed, $run->getStatus());
+        self::assertSame([3, 2], [$run->getSeen(), $run->getUnreadable()]);
     }
 
     public function testOlderVersionThanTheOneKnownIsIgnored(): void

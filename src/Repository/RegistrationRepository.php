@@ -35,6 +35,29 @@ class RegistrationRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Marks these registrations as seen by $run, which also brings back one that was removed (ADR 0002).
+     *
+     * @param list<string> $externalIds
+     *
+     * @return int how many registrations matched
+     */
+    public function markSeen(Operation $operation, array $externalIds, ImportRun $run): int
+    {
+        if ([] === $externalIds) {
+            return 0;
+        }
+
+        return (int) $this->getEntityManager()->createQuery(
+            'UPDATE '.Registration::class.' r SET r.lastSeenRunId = :run, r.removedAt = NULL
+             WHERE r.operation = :operation AND r.externalId IN (:ids)',
+        )
+            ->setParameter('run', $run->getId())
+            ->setParameter('operation', $operation)
+            ->setParameter('ids', $externalIds)
+            ->execute();
+    }
+
     public function countSeenIn(Operation $operation, ImportRun $run): int
     {
         return (int) $this->createQueryBuilder('r')
