@@ -12,7 +12,7 @@ help: ## List the targets
 start: up install migrate ## Build, install and migrate: everything needed before a first import
 
 up: ## Build and start the containers
-	$(COMPOSE) up -d --build --wait
+	$(COMPOSE) up -d --build --wait --force-recreate
 
 install: ## Install the Composer dependencies
 	$(EXEC) composer install

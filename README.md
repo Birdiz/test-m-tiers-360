@@ -24,7 +24,7 @@ La CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) enchaîne les mê
 Sans `make` :
 
 ```bash
-docker compose up -d --build
+docker compose up -d --build --wait --force-recreate
 docker compose exec app composer install
 docker compose exec app bin/console doctrine:migrations:migrate -n
 docker compose exec app bin/console app:inscriptions:import
@@ -91,7 +91,7 @@ docker compose exec app vendor/bin/phpstan analyse
 ## Utilisation de l'IA
 
 Claude Code, avec les skills de Matt Pocock dans l'ordre : *grilling* → *domain-modeling* → *codebase-design* →
-*tdd* → *code-review* → *writing-for-agents*.
+*tdd* → *code-review* → *writing-for-agents*. J'ai aussi lancé le skill *improve-codebase-architecture*.
 
 - **Délégué** : l'écriture du code, des tests et des ADR, à partir des décisions prises en séance.
 - **Vérifié moi-même** : j'ai relu et amendé chaque ADR et relu les diffs du code. J'ai lancé l'import contre
