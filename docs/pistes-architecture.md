@@ -6,7 +6,7 @@ une piste écartée pour une raison durable aussi, pour qu'une revue suivante ne
 
 Force : **forte**, **à explorer** ou **spéculative**.
 
-## 1. Un seul module pour le passage complet et le retrait — en cours d'exploration
+## 1. Un seul module pour le passage complet et le retrait — tranchée (ADR 0013)
 
 Force : forte. ADR 0002, 0003, 0009.
 
