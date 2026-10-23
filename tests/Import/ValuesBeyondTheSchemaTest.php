@@ -2,9 +2,9 @@
 
 namespace App\Tests\Import;
 
-use App\Entity\ImportRunStatus;
-use App\Import\Anomaly;
-use App\Import\AnomalyCode;
+use App\Enum\ImportRunStatus;
+use App\Import\Submission\Anomaly;
+use App\Import\Submission\AnomalyCode;
 use App\Roster\RosterEntry;
 
 /**

@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Import;
+namespace App\Import\Submission;
 
 use App\Entity\Registration;
-use App\Entity\RegistrationStatus;
 use App\Entity\Session;
-use App\Entity\StructureType;
+use App\Enum\RegistrationStatus;
+use App\Enum\StructureType;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 /**

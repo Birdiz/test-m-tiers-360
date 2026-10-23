@@ -3,7 +3,7 @@
 namespace App\Tests\Import;
 
 use App\Entity\ImportRun;
-use App\Entity\ImportRunStatus;
+use App\Enum\ImportRunStatus;
 use Doctrine\DBAL\Exception\DriverException;
 use Symfony\Component\HttpClient\Response\MockResponse;
 

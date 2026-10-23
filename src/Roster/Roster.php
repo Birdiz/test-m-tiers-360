@@ -4,9 +4,9 @@ namespace App\Roster;
 
 use App\Entity\ImportRun;
 use App\Entity\Registration;
-use App\Entity\RegistrationStatus;
 use App\Entity\Session;
-use App\Entity\StructureType;
+use App\Enum\RegistrationStatus;
+use App\Enum\StructureType;
 
 /**
  * What the ops team reads for one session. Computed on read (ADRs 0004, 0008).

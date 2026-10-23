@@ -11,6 +11,9 @@ use PHPUnit\Framework\TestCase;
  */
 final class MigrationDescriptionTest extends TestCase
 {
+    /**
+     * @param class-string<AbstractMigration> $class
+     */
     #[DataProvider('migrations')]
     public function testMigrationHasADescription(string $class): void
     {
@@ -25,6 +28,9 @@ final class MigrationDescriptionTest extends TestCase
         foreach (glob(dirname(__DIR__, 2).'/migrations/Version*.php') ?: [] as $file) {
             require_once $file;
             $class = 'DoctrineMigrations\\'.basename($file, '.php');
+            if (!is_subclass_of($class, AbstractMigration::class)) {
+                throw new \LogicException(basename($file).' does not define '.$class.' as a migration.');
+            }
 
             yield basename($file) => [$class];
         }

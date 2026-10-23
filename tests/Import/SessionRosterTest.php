@@ -2,8 +2,8 @@
 
 namespace App\Tests\Import;
 
-use App\Entity\ImportRunStatus;
-use App\Entity\StructureType;
+use App\Enum\ImportRunStatus;
+use App\Enum\StructureType;
 use App\Roster\ReviewReason;
 use App\Roster\RosterEntry;
 use Symfony\Component\Clock\Test\ClockSensitiveTrait;

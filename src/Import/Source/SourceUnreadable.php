@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Import;
+namespace App\Import\Source;
 
 /**
  * The form API answered, but not with the documented shape.

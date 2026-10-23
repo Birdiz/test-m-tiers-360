@@ -3,7 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\ImportRun;
-use App\Entity\ImportRunStatus;
+use App\Enum\ImportRunStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;

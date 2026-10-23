@@ -2,7 +2,7 @@
 
 namespace App\Entity;
 
-use App\Import\SessionSnapshot;
+use App\Import\Submission\SessionSnapshot;
 use App\Repository\SessionRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
