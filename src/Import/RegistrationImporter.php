@@ -27,7 +27,7 @@ use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
  * what two complete runs in a row did not find in the source (ADRs 0002, 0009).
  *
  * Never throws on a source failure: the returned run says how it ended. Any other failure (database, bug) is
- * recorded on the run, marked failed, and rethrown (ADR 0013).
+ * recorded on the run, marked failed, and rethrown (ADR 0016).
  */
 final readonly class RegistrationImporter
 {
