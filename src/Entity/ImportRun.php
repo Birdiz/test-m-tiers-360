@@ -23,6 +23,7 @@ class ImportRun
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $finishedAt = null;
 
+    /** Submissions of the source this run saw, readable or not, each counted once (ADR 0020). */
     #[ORM\Column]
     private int $seen = 0;
 
@@ -49,11 +50,6 @@ class ImportRun
     ) {
     }
 
-    public function countSeen(): void
-    {
-        ++$this->seen;
-    }
-
     public function countCreated(): void
     {
         ++$this->created;
@@ -67,6 +63,14 @@ class ImportRun
     public function reportUnreadable(?string $submission, string $reason): void
     {
         $this->problems[] = ['submission' => $submission, 'reason' => $reason];
+    }
+
+    /**
+     * Written after each page, in the page's transaction: a run that stops keeps what its last committed page saw.
+     */
+    public function recordSeen(int $seen): void
+    {
+        $this->seen = $seen;
     }
 
     public function complete(int $removed, \DateTimeImmutable $at): void

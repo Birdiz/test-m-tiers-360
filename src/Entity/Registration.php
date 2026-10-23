@@ -93,11 +93,11 @@ class Registration
     #[ORM\Column(type: Types::JSON)]
     private array $anomalies;
 
-    /** Id of the last import run that saw this registration in the source. */
-    #[ORM\Column]
-    private int $lastSeenRunId;
+    /** Id of the last import run that saw this registration in the source: written by the run tally (ADR 0020). */
+    #[ORM\Column(nullable: true)]
+    private ?int $lastSeenRunId = null;
 
-    /** Set when a complete run no longer finds it in the source (ADR 0002). */
+    /** Set by the run tally when two complete runs in a row no longer find it in the source (ADRs 0002, 0020). */
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $removedAt = null;
 
@@ -110,22 +110,18 @@ class Registration
         private string $externalId,
         NormalizedSubmissionDto $submission,
         Session $session,
-        int $runId,
     ) {
         $this->copy($submission, $session);
         $this->joinedSessionAt = $submission->sourceCreatedAt;
-        $this->lastSeenRunId = $runId;
     }
 
     /**
-     * Records that the source still has this registration, and takes its version unless it is older than ours.
+     * Takes the source version unless it is older than ours.
      *
      * @return bool whether the source version was applied
      */
-    public function seenInSource(NormalizedSubmissionDto $submission, Session $session, int $runId): bool
+    public function applyVersion(NormalizedSubmissionDto $submission, Session $session): bool
     {
-        $this->stillInSource($runId);
-
         if ($submission->sourceUpdatedAt <= $this->sourceUpdatedAt) {
             return false;
         }
@@ -136,15 +132,6 @@ class Registration
         $this->copy($submission, $session);
 
         return true;
-    }
-
-    /**
-     * Records that the source still has this registration, without taking its version (it could not be read).
-     */
-    public function stillInSource(int $runId): void
-    {
-        $this->lastSeenRunId = $runId;
-        $this->removedAt = null;
     }
 
     private function copy(NormalizedSubmissionDto $submission, Session $session): void

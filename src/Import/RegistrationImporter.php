@@ -23,8 +23,8 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 
 /**
- * One import run: reads every page of the source, applies each page in its own transaction, and removes
- * what two complete runs in a row did not find in the source (ADRs 0002, 0009).
+ * One import run: reads every page of the source and applies each page in its own transaction (ADR 0009); the
+ * run tally says what the run saw and how it ends (ADR 0020).
  *
  * Never throws on a source failure: the returned run says how it ended. Any other failure (database, bug) is
  * recorded on the run, marked failed, and rethrown (ADR 0016).
@@ -70,45 +70,25 @@ final readonly class RegistrationImporter
 
     private function import(ImportRun $run): void
     {
-        $operation = null;
-        $total = null;
-        $totalChanged = false;
-        // Unreadable submissions that match no known registration: in the source, but not countable in our table.
-        $unmatched = 0;
+        $tally = new RunTally($run, $this->registrations, $this->runs, $this->clock, $this->logger);
         try {
             foreach ($this->formApi->pages() as $page) {
                 // Checked before the page's transaction: an exception inside it closes the entity manager.
                 $this->assertStorableForm($page);
-                $totalChanged = $totalChanged || (null !== $total && $total !== $page->total);
-                $total ??= $page->total;
-                $operation = $this->entityManager->wrapInTransaction(function () use ($page, $run, &$unmatched): Operation {
-                    return $this->applyPage($page, $run, $unmatched);
+                $this->entityManager->wrapInTransaction(function () use ($page, $run, $tally): void {
+                    $this->applyPage($page, $run, $tally);
                 });
             }
         } catch (ExceptionInterface|SourceUnreadable $e) {
-            $this->logger->error('Import run failed: {error}', ['error' => $e->getMessage()]);
-            $run->fail($e->getMessage(), $this->clock->now());
-            $this->entityManager->flush();
-
-            return;
-        }
-
-        $seen = null === $operation ? 0 : $this->registrations->countSeenIn($operation, $run) + $unmatched;
-        if (null === $operation || $totalChanged || $seen !== $total) {
-            $this->logger->warning('Import run incomplete: saw {seen} of {total} submissions, nothing removed.', ['seen' => $seen, 'total' => $total]);
-            $run->endIncomplete(\sprintf('Saw %d submissions, the source announced %s.', $seen, $totalChanged ? 'a changing total' : $total), $this->clock->now());
+            $tally->fail($e->getMessage());
             $this->entityManager->flush();
 
             return;
         }
 
         // Removals and the completed status are written together: only a completed run removes anything (ADR 0002).
-        $this->entityManager->wrapInTransaction(function () use ($operation, $run): void {
-            // The count cannot catch a deletion and an insertion that cancel out while pages shift: a registration
-            // skipped that way is only removed if the previous complete run missed it too (ADR 0002).
-            $previous = $this->runs->lastCompletedBefore($run);
-            $removed = null === $previous ? 0 : $this->registrations->removeNotSeenSince($operation, $previous, $this->clock->now());
-            $run->complete($removed, $this->clock->now());
+        $this->entityManager->wrapInTransaction(static function () use ($tally): void {
+            $tally->finish();
         });
     }
 
@@ -127,10 +107,9 @@ final readonly class RegistrationImporter
         }
     }
 
-    private function applyPage(SourcePageDto $page, ImportRun $run, int &$unmatched): Operation
+    private function applyPage(SourcePageDto $page, ImportRun $run, RunTally $tally): void
     {
         $operation = $this->upsertOperation($page);
-        $runId = (int) $run->getId();
 
         $submissions = [];
         $unreadable = [];
@@ -145,32 +124,26 @@ final readonly class RegistrationImporter
             }
         }
 
-        $ids = [...array_keys($submissions), ...array_filter($unreadable)];
-        $known = $this->registrations->findByExternalIds($operation, array_map('strval', $ids));
-        // An unreadable submission we already know is still in the source: it must not be removed.
-        foreach ($unreadable as $externalId) {
-            null !== $externalId && isset($known[$externalId]) ? $known[$externalId]->stillInSource($runId) : ++$unmatched;
-        }
-
+        $readable = array_map('strval', array_keys($submissions));
+        $known = $this->registrations->findByExternalIds($operation, $readable);
         foreach ($submissions as $externalId => $submission) {
             $session = $this->upsertSession($operation, $submission->session);
             $registration = $known[$externalId] ?? null;
             if (null === $registration) {
-                $this->entityManager->persist(new Registration($operation, $externalId, $submission, $session, $runId));
+                $this->entityManager->persist(new Registration($operation, $externalId, $submission, $session));
                 $run->countCreated();
-            } elseif ($registration->seenInSource($submission, $session, $runId)) {
+            } elseif ($registration->applyVersion($submission, $session)) {
                 $run->countUpdated();
             }
-            $run->countSeen();
         }
 
         $this->entityManager->flush();
+        // After the flush: the registrations this page created are marked seen too.
+        $tally->recordPage($operation, $page->total, $readable, $unreadable);
         // Keep memory to one page: registrations are not needed once written.
         foreach ($this->entityManager->getUnitOfWork()->getIdentityMap()[Registration::class] ?? [] as $registration) {
             $this->entityManager->detach($registration);
         }
-
-        return $operation;
     }
 
     /**

@@ -64,9 +64,14 @@ _Éviter_ : erreur, rejet
 
 **Passage d'import** :
 Une exécution de l'import qui relit toutes les inscriptions de la source. Il est **complet** quand toutes
-les pages ont été lues et que le nombre de soumissions vues correspond au total annoncé par la source.
-Dans le code : `ImportRun`.
+les pages ont été lues et que le nombre de soumissions vues, lisibles ou non et chacune comptée une fois,
+correspond au total annoncé par la source. Dans le code : `ImportRun`.
 _Éviter_ : synchro, job
+
+**Relevé du passage** :
+Ce qu'un passage d'import a vu de la source (le total annoncé, les soumissions vues) et ce qu'il en conclut :
+s'il est complet, et quelles inscriptions sont retirées. Dans le code : `RunTally`.
+_Éviter_ : rapport, décompte
 
 **Soumission illisible** :
 Soumission impossible à rattacher à une inscription ou à une session (sans identifiant, sans session…).

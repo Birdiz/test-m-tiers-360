@@ -171,9 +171,79 @@ final class RegistrationImporterTest extends ImportTestCase
         // Seen 293 = total announced, yet one registration still in the source was skipped: the count alone
         // cannot tell. It is not removed, because it was seen in the previous complete run.
         self::assertSame(ImportRunStatus::Completed, $run->getStatus());
-        self::assertSame(0, $run->getRemoved());
-        self::assertSame(0, $this->roster('ses_01')->summary->removed + $this->roster('ses_02')->summary->removed
-            + $this->roster('ses_03')->summary->removed + $this->roster('ses_04')->summary->removed);
+        self::assertSame([0, 0], [$run->getRemoved(), $this->removedEverywhere()]);
+    }
+
+    public function testTotalChangingDuringTheRunEndsItIncompleteWithoutRemovingAnything(): void
+    {
+        $this->sourceMissingOneSubmissionSinceTheLastCompleteRun();
+        // After page 2 is read, a submission of page 1 is deleted: the next pages announce 291, and page 3 now
+        // starts one submission later, so one is never read.
+        $this->formApi()->changeAfterPage(2, static fn (array $submissions): array => \array_slice($submissions, 1));
+
+        $run = $this->runImport();
+
+        self::assertSame(ImportRunStatus::Incomplete, $run->getStatus());
+        self::assertSame('Saw 291 submissions, the source announced a changing total.', $run->getReason());
+        // The missing submission was missed by two runs in a row, but this one did not see the whole source.
+        self::assertSame([0, 0], [$run->getRemoved(), $this->removedEverywhere()]);
+    }
+
+    public function testSubmissionReadTwiceAndOneNeverReadAtTheSameTotalEndsTheRunIncomplete(): void
+    {
+        $this->sourceMissingOneSubmissionSinceTheLastCompleteRun();
+        // After page 2 is read, one submission arrives first and the last one is deleted: the total stays at 292,
+        // but page 3 now starts one submission earlier, so the last one of page 2 is read again and the newcomer
+        // never is.
+        $this->formApi()->changeAfterPage(2, static fn (array $submissions): array => [
+            Submissions::submission(submission: ['id' => 'sub_newcomer', 'created_at' => '2026-10-20T10:00:00Z']),
+            ...\array_slice($submissions, 0, -1),
+        ]);
+
+        $run = $this->runImport();
+
+        self::assertSame(ImportRunStatus::Incomplete, $run->getStatus());
+        self::assertSame('Saw 291 submissions, the source announced 292.', $run->getReason());
+        // The run reports what it judged: the submission read twice is seen once (ADR 0020).
+        self::assertSame(291, $run->getSeen());
+        self::assertSame([0, 0], [$run->getRemoved(), $this->removedEverywhere()]);
+    }
+
+    public function testUnreadableSubmissionsAreSeen(): void
+    {
+        $this->formApi()->serve([
+            Submissions::submission(),
+            Submissions::submission(['session' => null], ['id' => 'sub_nosession']),
+            Submissions::submission(submission: ['id' => null]),
+        ]);
+
+        $run = $this->runImport();
+
+        // Unreadable, but in the source: they count towards the total announced (ADR 0020).
+        self::assertSame(ImportRunStatus::Completed, $run->getStatus());
+        self::assertSame([3, 2], [$run->getSeen(), $run->getUnreadable()]);
+    }
+
+    public function testUnreadableSubmissionReadTwiceIsSeenOnce(): void
+    {
+        // 30 submissions; the last of page 1 has no session, and no registration matches it.
+        $submissions = [];
+        for ($i = 0; $i < 30; ++$i) {
+            $submissions[] = Submissions::submission(submission: ['id' => \sprintf('sub_%02d', $i)]);
+        }
+        $submissions[24]['answers']['session'] = null;
+        $this->formApi()->serve($submissions);
+        // After page 1 is read, one submission arrives first and the last one is deleted: the total stays at 30,
+        // but page 2 now starts one submission earlier, so the unreadable one is read again and the newcomer never is.
+        $this->formApi()->changeAfterPage(1, static fn (array $submissions): array => [
+            Submissions::submission(submission: ['id' => 'sub_newcomer']),
+            ...\array_slice($submissions, 0, -1),
+        ]);
+
+        $run = $this->runImport();
+
+        self::assertSame(ImportRunStatus::Incomplete, $run->getStatus());
+        self::assertSame(29, $run->getSeen());
     }
 
     public function testOlderVersionThanTheOneKnownIsIgnored(): void
@@ -257,5 +327,28 @@ final class RegistrationImporterTest extends ImportTestCase
             array_map(static fn (ImportRun $run): ImportRunStatus => $run->getStatus(), $this->storedRuns()),
         );
         self::assertStringStartsWith('Interrupted', (string) $this->storedRuns()[1]->getReason());
+    }
+
+    /**
+     * The v1 source, then the same source without its 11th submission: the last complete run missed it once.
+     */
+    private function sourceMissingOneSubmissionSinceTheLastCompleteRun(): void
+    {
+        $submissions = Submissions::dataset('submissions-v1.json');
+        $this->formApi()->serve($submissions);
+        $this->runImport();
+        unset($submissions[10]);
+        $this->formApi()->serve(array_values($submissions));
+        self::assertSame(ImportRunStatus::Completed, $this->runImport()->getStatus());
+    }
+
+    private function removedEverywhere(): int
+    {
+        $removed = 0;
+        foreach (['ses_01', 'ses_02', 'ses_03', 'ses_04'] as $session) {
+            $removed += $this->roster($session)->summary->removed;
+        }
+
+        return $removed;
     }
 }
