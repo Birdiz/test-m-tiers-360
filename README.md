@@ -17,6 +17,9 @@ make summary SESSION=ses_03
 make check
 ```
 
+La CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) enchaîne les mêmes cibles à chaque pull request :
+`make start`, `make check`, puis un import contre le simulateur.
+
 Sans `make` :
 
 ```bash
