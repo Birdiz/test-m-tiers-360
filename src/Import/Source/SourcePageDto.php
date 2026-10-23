@@ -1,11 +1,13 @@
 <?php
 
-namespace App\Import;
+declare(strict_types=1);
 
-final readonly class SourcePage
+namespace App\Import\Source;
+
+final readonly class SourcePageDto
 {
     /**
-     * @param list<array<string, mixed>> $submissions raw submissions, as served
+     * @param list<mixed> $submissions raw submissions, as served: each one is checked by SubmissionNormalizer
      */
     public function __construct(
         public string $formId,

@@ -13,15 +13,22 @@ use Psr\Log\LoggerInterface;
 
 /**
  * What one import run saw of the source, and what it concludes: whether the run is complete, and which
- * registrations two complete runs in a row did not find (ADRs 0002, 0013). The only writer of "seen by run N".
+ * registrations two complete runs in a row did not find (ADRs 0002, 0020). The only writer of "seen by run N".
  */
 final class RunTally
 {
     private ?Operation $operation = null;
     private ?int $total = null;
     private bool $totalChanged = false;
-    // Submissions that match no registration (unreadable ones): in the source, but not countable in our table.
-    private int $unmatched = 0;
+    /**
+     * Unreadable submissions that match no registration: in the source, but not countable in our table. Kept by id
+     * so a page shift does not count one twice; few, since the source rarely serves one.
+     *
+     * @var array<string, true>
+     */
+    private array $unmatched = [];
+    // Unreadable submissions without an id: each one counts, nothing tells two apart.
+    private int $withoutId = 0;
 
     public function __construct(
         private readonly ImportRun $run,
@@ -33,35 +40,48 @@ final class RunTally
     }
 
     /**
-     * Records a page of the source once its registrations are written, in the page's transaction.
+     * Records a page of the source in its transaction, once its registrations are written.
      *
-     * @param list<?string> $externalIds every submission of the page, readable or not; null when it has no id
+     * @param list<string>  $readable   ids of the page's readable submissions, all registrations by now
+     * @param list<?string> $unreadable ids of its unreadable ones, null when a submission has none
      */
-    public function recordPage(Operation $operation, int $total, array $externalIds): void
+    public function recordPage(Operation $operation, int $total, array $readable, array $unreadable): void
     {
         $this->operation = $operation;
         $this->totalChanged = $this->totalChanged || (null !== $this->total && $this->total !== $total);
         $this->total ??= $total;
 
         $ids = [];
-        foreach ($externalIds as $externalId) {
+        foreach ($unreadable as $externalId) {
             if (null === $externalId) {
-                ++$this->unmatched;
+                ++$this->withoutId;
             } else {
-                $ids[$externalId] = $externalId;
+                $ids[] = $externalId;
             }
         }
-        $this->unmatched += \count($ids) - $this->registrations->markSeen($operation, array_values($ids), $this->run);
+        $this->registrations->markSeen($operation, [...$readable, ...$ids], $this->run);
+
+        $known = $this->registrations->findKnownExternalIds($operation, $ids);
+        foreach (array_diff($ids, $known) as $externalId) {
+            $this->unmatched[$externalId] = true;
+        }
+        // Unreadable on an earlier page, readable now: a registration, counted with the others.
+        foreach ($readable as $externalId) {
+            unset($this->unmatched[$externalId]);
+        }
+
+        $this->run->recordSeen($this->registrations->countSeenIn($operation, $this->run) + \count($this->unmatched) + $this->withoutId);
     }
 
     public function fail(string $reason): void
     {
         $this->logger->error('Import run failed: {error}', ['error' => $reason]);
-        $this->run->fail($this->seen(), $reason, $this->clock->now());
+        $this->run->fail($reason, $this->clock->now());
     }
 
     /**
-     * Ends a run that read every page: complete, with its removals, or incomplete, removing nothing.
+     * Ends a run that read every page: complete, with its removals, or incomplete, removing nothing. Expects a
+     * transaction, so that removals are only written with the completed status (ADR 0016).
      */
     public function finish(): void
     {
@@ -69,10 +89,10 @@ final class RunTally
             throw new \LogicException('A run that read every page recorded at least one: FormApi serves the first page or fails.');
         }
 
-        $seen = $this->seen();
+        $seen = $this->run->getSeen();
         if ($this->totalChanged || $seen !== $this->total) {
             $this->logger->warning('Import run incomplete: saw {seen} of {total} submissions, nothing removed.', ['seen' => $seen, 'total' => $this->total]);
-            $this->run->endIncomplete($seen, \sprintf('Saw %d submissions, the source announced %s.', $seen, $this->totalChanged ? 'a changing total' : $this->total), $this->clock->now());
+            $this->run->endIncomplete(\sprintf('Saw %d submissions, the source announced %s.', $seen, $this->totalChanged ? 'a changing total' : $this->total), $this->clock->now());
 
             return;
         }
@@ -81,14 +101,6 @@ final class RunTally
         // skipped that way is only removed if the previous complete run missed it too (ADR 0002).
         $previous = $this->runs->lastCompletedBefore($this->run);
         $removed = null === $previous ? 0 : $this->registrations->removeNotSeenSince($this->operation, $previous, $this->clock->now());
-        $this->run->complete($seen, $removed, $this->clock->now());
-    }
-
-    /**
-     * Each submission once: a registration read twice because pages shifted is one row seen by this run.
-     */
-    private function seen(): int
-    {
-        return null === $this->operation ? $this->unmatched : $this->registrations->countSeenIn($this->operation, $this->run) + $this->unmatched;
+        $this->run->complete($removed, $this->clock->now());
     }
 }

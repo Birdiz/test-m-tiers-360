@@ -14,7 +14,7 @@ final class Version20261021150453 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Operations, sessions, registrations and import runs';
+        return 'Create the operation, session, registration and import_run tables; a registration is unique per (operation, source id), see ADR 0001';
     }
 
     public function up(Schema $schema): void

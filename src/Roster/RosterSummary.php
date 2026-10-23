@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Roster;
 
-use App\Entity\ImportRunStatus;
-use App\Entity\StructureType;
+use App\Enum\ImportRunStatus;
+use App\Enum\StructureType;
 
 final readonly class RosterSummary implements \JsonSerializable
 {

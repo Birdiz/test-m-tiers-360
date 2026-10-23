@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Import;
+declare(strict_types=1);
+
+namespace App\Import\Submission;
 
 /**
  * A submission that cannot be tied to a registration or a session. Unlike a dirty answer, it is not imported,

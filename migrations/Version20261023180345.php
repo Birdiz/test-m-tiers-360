@@ -14,7 +14,7 @@ final class Version20261023180345 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Let the run tally mark a new registration as seen, after the import has written it';
+        return 'Make registration.last_seen_run_id nullable, so the run tally marks a new registration as seen once the import has written it, see ADR 0020';
     }
 
     public function up(Schema $schema): void

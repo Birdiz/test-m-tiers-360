@@ -29,7 +29,10 @@ services:
       retries: 10
 
   app:
-    build: docker/php
+    build:
+      context: docker/php
+      args:
+        UID: ${APP_UID:-1000}
     # Serves public/ once the Symfony project exists; until then, the container just stays up.
     command: ["sh", "-c", "if [ -d public ]; then exec php -S 0.0.0.0:8000 -t public; else exec sleep infinity; fi"]
     volumes:

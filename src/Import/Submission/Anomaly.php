@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Import;
+declare(strict_types=1);
+
+namespace App\Import\Submission;
 
 /**
  * A field the import could not understand. Carries only the offending raw value (ADR 0003).

@@ -1,0 +1,10 @@
+# For a stack that runs beside another worktree's: the database and the mock stay inside the network, the app
+# moves to 8010. `!reset` and `!override` need Docker Compose 2.24 or later.
+services:
+  database:
+    ports: !reset []
+  form-api:
+    ports: !reset []
+  app:
+    ports: !override
+      - "8010:8000"

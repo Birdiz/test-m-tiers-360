@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Import;
 
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -35,6 +37,11 @@ final class FakeFormApi
         $this->submissions = $submissions;
     }
 
+    public function form(string $id, string $title): void
+    {
+        $this->form = ['id' => $id, 'title' => $title];
+    }
+
     /**
      * Serves one of the kit's datasets (mock-api/data/).
      */
@@ -51,7 +58,7 @@ final class FakeFormApi
      */
     public function script(int $page, MockResponse ...$responses): void
     {
-        $this->scripted[$page] = [...($this->scripted[$page] ?? []), ...$responses];
+        $this->scripted[$page] = [...($this->scripted[$page] ?? []), ...array_values($responses)];
     }
 
     /**

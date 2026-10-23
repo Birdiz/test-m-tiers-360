@@ -1,22 +1,37 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Entity;
 
-use App\Import\Anomaly;
-use App\Import\AnomalyCode;
-use App\Import\NormalizedSubmission;
+use App\Enum\RegistrationStatus;
+use App\Enum\StructureType;
+use App\Import\Submission\Anomaly;
+use App\Import\Submission\AnomalyCode;
+use App\Import\Submission\NormalizedSubmissionDto;
 use App\Repository\RegistrationRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * Owned by the import: every field comes from the source (ADR 0007).
+ *
+ * Its constraints are the database's, nothing more: what the column cannot hold (ADR 0014).
  */
 #[ORM\Entity(repositoryClass: RegistrationRepository::class)]
 #[ORM\UniqueConstraint(columns: ['operation_id', 'external_id'])]
 #[ORM\Index(columns: ['session_id'])]
 class Registration
 {
+    public const EXTERNAL_ID_LENGTH = 64;
+    public const NAME_LENGTH = 255;
+    public const EMAIL_LENGTH = 255;
+    public const PHONE_LENGTH = 32;
+    public const STRUCTURE_NAME_LENGTH = 255;
+    /** Postgres has no year 0 nor any year before it, as Doctrine writes dates. */
+    private const FIRST_STORABLE_DAY = '0001-01-01';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -30,9 +45,11 @@ class Registration
     private RegistrationStatus $status;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[Assert\GreaterThanOrEqual(self::FIRST_STORABLE_DAY)]
     private \DateTimeImmutable $sourceCreatedAt;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[Assert\GreaterThanOrEqual(self::FIRST_STORABLE_DAY)]
     private \DateTimeImmutable $sourceUpdatedAt;
 
     /**
@@ -42,25 +59,31 @@ class Registration
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $joinedSessionAt;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: self::NAME_LENGTH)]
+    #[Assert\Length(max: self::NAME_LENGTH)]
     private string $firstName;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: self::NAME_LENGTH)]
+    #[Assert\Length(max: self::NAME_LENGTH)]
     private string $lastName;
 
-    #[ORM\Column(length: 255, nullable: true)]
+    #[ORM\Column(length: self::EMAIL_LENGTH, nullable: true)]
+    #[Assert\Length(max: self::EMAIL_LENGTH)]
     private ?string $email;
 
-    #[ORM\Column(length: 32, nullable: true)]
+    #[ORM\Column(length: self::PHONE_LENGTH, nullable: true)]
+    #[Assert\Length(max: self::PHONE_LENGTH)]
     private ?string $phone;
 
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
+    #[Assert\GreaterThanOrEqual(self::FIRST_STORABLE_DAY)]
     private ?\DateTimeImmutable $birthDate;
 
     #[ORM\Column(length: 32, enumType: StructureType::class)]
     private StructureType $structureType;
 
-    #[ORM\Column(length: 255, nullable: true)]
+    #[ORM\Column(length: self::STRUCTURE_NAME_LENGTH, nullable: true)]
+    #[Assert\Length(max: self::STRUCTURE_NAME_LENGTH)]
     private ?string $structureName;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
@@ -70,11 +93,11 @@ class Registration
     #[ORM\Column(type: Types::JSON)]
     private array $anomalies;
 
-    /** Id of the last import run that saw this registration in the source: written by the run tally (ADR 0013). */
+    /** Id of the last import run that saw this registration in the source: written by the run tally (ADR 0020). */
     #[ORM\Column(nullable: true)]
     private ?int $lastSeenRunId = null;
 
-    /** Set by the run tally when two complete runs in a row no longer find it in the source (ADRs 0002, 0013). */
+    /** Set by the run tally when two complete runs in a row no longer find it in the source (ADRs 0002, 0020). */
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $removedAt = null;
 
@@ -82,9 +105,10 @@ class Registration
         #[ORM\ManyToOne]
         #[ORM\JoinColumn(nullable: false)]
         private Operation $operation,
-        #[ORM\Column(length: 64)]
+        #[ORM\Column(length: self::EXTERNAL_ID_LENGTH)]
+        #[Assert\Length(max: self::EXTERNAL_ID_LENGTH)]
         private string $externalId,
-        NormalizedSubmission $submission,
+        NormalizedSubmissionDto $submission,
         Session $session,
     ) {
         $this->copy($submission, $session);
@@ -96,7 +120,7 @@ class Registration
      *
      * @return bool whether the source version was applied
      */
-    public function applyVersion(NormalizedSubmission $submission, Session $session): bool
+    public function applyVersion(NormalizedSubmissionDto $submission, Session $session): bool
     {
         if ($submission->sourceUpdatedAt <= $this->sourceUpdatedAt) {
             return false;
@@ -110,7 +134,7 @@ class Registration
         return true;
     }
 
-    private function copy(NormalizedSubmission $submission, Session $session): void
+    private function copy(NormalizedSubmissionDto $submission, Session $session): void
     {
         $this->session = $session;
         $this->status = $submission->status;

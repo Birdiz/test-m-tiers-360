@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Entity;
 
+use App\Enum\ImportRunStatus;
 use App\Repository\ImportRunRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -20,7 +23,7 @@ class ImportRun
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $finishedAt = null;
 
-    /** Submissions of the source this run saw, readable or not, each counted once (ADR 0013). */
+    /** Submissions of the source this run saw, readable or not, each counted once (ADR 0020). */
     #[ORM\Column]
     private int $seen = 0;
 
@@ -62,28 +65,35 @@ class ImportRun
         $this->problems[] = ['submission' => $submission, 'reason' => $reason];
     }
 
-    public function complete(int $seen, int $removed, \DateTimeImmutable $at): void
+    /**
+     * Written after each page, in the page's transaction: a run that stops keeps what its last committed page saw.
+     */
+    public function recordSeen(int $seen): void
+    {
+        $this->seen = $seen;
+    }
+
+    public function complete(int $removed, \DateTimeImmutable $at): void
     {
         $this->removed = $removed;
-        $this->finish(ImportRunStatus::Completed, $seen, $at);
+        $this->finish(ImportRunStatus::Completed, $at);
     }
 
-    public function endIncomplete(int $seen, string $reason, \DateTimeImmutable $at): void
+    public function endIncomplete(string $reason, \DateTimeImmutable $at): void
     {
         $this->reason = $reason;
-        $this->finish(ImportRunStatus::Incomplete, $seen, $at);
+        $this->finish(ImportRunStatus::Incomplete, $at);
     }
 
-    public function fail(int $seen, string $reason, \DateTimeImmutable $at): void
+    public function fail(string $reason, \DateTimeImmutable $at): void
     {
         $this->reason = $reason;
-        $this->finish(ImportRunStatus::Failed, $seen, $at);
+        $this->finish(ImportRunStatus::Failed, $at);
     }
 
-    private function finish(ImportRunStatus $status, int $seen, \DateTimeImmutable $at): void
+    private function finish(ImportRunStatus $status, \DateTimeImmutable $at): void
     {
         $this->status = $status;
-        $this->seen = $seen;
         $this->finishedAt = $at;
     }
 

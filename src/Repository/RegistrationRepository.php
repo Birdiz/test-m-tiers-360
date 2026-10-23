@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Repository;
 
 use App\Entity\ImportRun;
@@ -39,16 +41,14 @@ class RegistrationRepository extends ServiceEntityRepository
      * Marks these registrations as seen by $run, which also brings back one that was removed (ADR 0002).
      *
      * @param list<string> $externalIds
-     *
-     * @return int how many registrations matched
      */
-    public function markSeen(Operation $operation, array $externalIds, ImportRun $run): int
+    public function markSeen(Operation $operation, array $externalIds, ImportRun $run): void
     {
         if ([] === $externalIds) {
-            return 0;
+            return;
         }
 
-        return (int) $this->getEntityManager()->createQuery(
+        $this->getEntityManager()->createQuery(
             'UPDATE '.Registration::class.' r SET r.lastSeenRunId = :run, r.removedAt = NULL
              WHERE r.operation = :operation AND r.externalId IN (:ids)',
         )
@@ -56,6 +56,28 @@ class RegistrationRepository extends ServiceEntityRepository
             ->setParameter('operation', $operation)
             ->setParameter('ids', $externalIds)
             ->execute();
+    }
+
+    /**
+     * @param list<string> $externalIds
+     *
+     * @return list<string> those of $externalIds that are registrations of the operation
+     */
+    public function findKnownExternalIds(Operation $operation, array $externalIds): array
+    {
+        if ([] === $externalIds) {
+            return [];
+        }
+
+        /** @var list<string> */
+        return $this->createQueryBuilder('r')
+            ->select('r.externalId')
+            ->where('r.operation = :operation')
+            ->andWhere('r.externalId IN (:ids)')
+            ->setParameter('operation', $operation)
+            ->setParameter('ids', $externalIds)
+            ->getQuery()
+            ->getSingleColumnResult();
     }
 
     public function countSeenIn(Operation $operation, ImportRun $run): int

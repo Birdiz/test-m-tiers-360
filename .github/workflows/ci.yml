@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      # The app image runs with the runner's uid, so it can write vendor/ and var/ in the checkout.
+      - run: echo "APP_UID=$(id -u)" >> "$GITHUB_ENV"
+      - run: make start
+      - run: make check
+      # Green tests are not enough (ADR 0011): import once against the real mock, which fails a page and slows one.
+      - run: make import
+      - run: make runs
+      - if: failure()
+        run: docker compose logs

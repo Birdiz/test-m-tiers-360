@@ -1,19 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Import;
 
 /**
  * Builds submissions shaped like the form API's (docs/api-formulaire.md) for the tests.
+ *
+ * @phpstan-type RawSubmission array{id: mixed, status: mixed, created_at: mixed, updated_at: mixed, answers: array<string, mixed>}
  */
 final class Submissions
 {
     /**
      * A submission as served by the form API (docs/api-formulaire.md), with optional overrides of its answers.
      *
-     * @param array<string, mixed> $answers
-     * @param array<string, mixed> $submission
+     * @param array<string, mixed>                                                      $answers
+     * @param array{id?: mixed, status?: mixed, created_at?: mixed, updated_at?: mixed} $submission
      *
-     * @return array<string, mixed>
+     * @return RawSubmission
      */
     public static function submission(array $answers = [], array $submission = []): array
     {
@@ -45,10 +49,13 @@ final class Submissions
     /**
      * The submissions of one of the kit's datasets (mock-api/data/).
      *
-     * @return list<array<string, mixed>>
+     * @return list<RawSubmission>
      */
     public static function dataset(string $file): array
     {
-        return json_decode((string) file_get_contents(\dirname(__DIR__, 2).'/mock-api/data/'.$file), true, flags: \JSON_THROW_ON_ERROR)['submissions'];
+        /** @var array{submissions: list<RawSubmission>} $dataset */
+        $dataset = json_decode((string) file_get_contents(\dirname(__DIR__, 2).'/mock-api/data/'.$file), true, flags: \JSON_THROW_ON_ERROR);
+
+        return $dataset['submissions'];
     }
 }
