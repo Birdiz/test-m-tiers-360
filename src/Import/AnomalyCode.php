@@ -8,4 +8,6 @@ enum AnomalyCode: string
     case Invalid = 'invalid';
     case Implausible = 'implausible';
     case Unknown = 'unknown';
+    /** Longer than our column: the field is left empty rather than cut (ADR 0014). */
+    case TooLong = 'too_long';
 }

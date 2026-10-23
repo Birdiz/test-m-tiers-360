@@ -2,15 +2,26 @@
 
 namespace App\Import;
 
+use App\Entity\Registration;
 use App\Entity\RegistrationStatus;
+use App\Entity\Session;
 use App\Entity\StructureType;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 /**
  * Turns one submission of the form API into our vocabulary. Never rejects a dirty answer:
  * the field is left empty and an anomaly says why (ADR 0003).
+ *
+ * Each value is checked against the constraints of the entity property it ends up in, which mirror the
+ * database columns: what it returns can be stored (ADR 0014).
  */
-final class SubmissionNormalizer
+final readonly class SubmissionNormalizer
 {
+    public function __construct(
+        private ValidatorInterface $validator,
+    ) {
+    }
+
     /**
      * @param array<string, mixed> $submission
      */
@@ -18,11 +29,14 @@ final class SubmissionNormalizer
     {
         $answers = \is_array($submission['answers'] ?? null) ? $submission['answers'] : [];
         $externalId = self::trimToNull($submission['id'] ?? null) ?? throw new UnreadableSubmission('no id');
+        if (!$this->fits(Registration::class, 'externalId', $externalId)) {
+            throw new UnreadableSubmission('id our database cannot hold', $externalId);
+        }
         $status = RegistrationStatus::tryFrom(\is_string($submission['status'] ?? null) ? $submission['status'] : '')
             ?? throw new UnreadableSubmission('unknown status', $externalId);
-        $createdAt = self::parseTimestamp($submission['created_at'] ?? null) ?? throw new UnreadableSubmission('unreadable created_at', $externalId);
-        $updatedAt = self::parseTimestamp($submission['updated_at'] ?? null) ?? throw new UnreadableSubmission('unreadable updated_at', $externalId);
-        $session = self::parseSession($answers['session'] ?? null) ?? throw new UnreadableSubmission('no readable session', $externalId);
+        $createdAt = $this->keepStorableTimestamp('sourceCreatedAt', self::parseTimestamp($submission['created_at'] ?? null)) ?? throw new UnreadableSubmission('unreadable created_at', $externalId);
+        $updatedAt = $this->keepStorableTimestamp('sourceUpdatedAt', self::parseTimestamp($submission['updated_at'] ?? null)) ?? throw new UnreadableSubmission('unreadable updated_at', $externalId);
+        $session = $this->parseStorableSession($answers['session'] ?? null) ?? throw new UnreadableSubmission('no readable session', $externalId);
         $anomalies = [];
 
         return new NormalizedSubmission(
@@ -30,13 +44,13 @@ final class SubmissionNormalizer
             status: $status,
             sourceCreatedAt: $createdAt,
             sourceUpdatedAt: $updatedAt,
-            firstName: self::normalizeName('first_name', $answers['first_name'] ?? null, $anomalies),
-            lastName: self::normalizeName('last_name', $answers['last_name'] ?? null, $anomalies),
-            email: self::normalizeEmail($answers['email'] ?? null, $anomalies),
-            phone: self::normalizePhone($answers['phone'] ?? null, $anomalies),
+            firstName: $this->keepIfStorable('first_name', 'firstName', self::normalizeName('first_name', $answers['first_name'] ?? null, $anomalies), $anomalies) ?? '',
+            lastName: $this->keepIfStorable('last_name', 'lastName', self::normalizeName('last_name', $answers['last_name'] ?? null, $anomalies), $anomalies) ?? '',
+            email: $this->keepIfStorable('email', 'email', self::normalizeEmail($answers['email'] ?? null, $anomalies), $anomalies),
+            phone: $this->keepIfStorable('phone', 'phone', self::normalizePhone($answers['phone'] ?? null, $anomalies), $anomalies),
             birthDate: self::normalizeBirthDate($answers['birth_date'] ?? null, $createdAt, $anomalies),
             structureType: self::normalizeStructureType($answers['structure_type'] ?? null, $anomalies),
-            structureName: self::normalizeStructureName($answers['structure_name'] ?? null, $anomalies),
+            structureName: $this->keepIfStorable('structure_name', 'structureName', self::normalizeStructureName($answers['structure_name'] ?? null, $anomalies), $anomalies),
             comment: self::trimToNull($answers['comment'] ?? null),
             session: $session,
             anomalies: $anomalies,
@@ -158,9 +172,69 @@ final class SubmissionNormalizer
         return $name;
     }
 
+    /**
+     * Drops NUL bytes: Postgres cannot store them, and the driver silently cuts a value at the first one.
+     */
     private static function trimToNull(mixed $raw): ?string
     {
-        return \is_string($raw) && '' !== trim($raw) ? trim($raw) : null;
+        $text = \is_string($raw) ? trim(str_replace("\0", '', $raw)) : '';
+
+        return '' !== $text ? $text : null;
+    }
+
+    /**
+     * Whether the database can hold this value in that entity property (ADR 0014).
+     *
+     * @param class-string $entity
+     */
+    private function fits(string $entity, string $property, mixed $value): bool
+    {
+        return 0 === \count($this->validator->validatePropertyValue($entity, $property, $value));
+    }
+
+    /**
+     * An answer the database cannot hold is left empty and flagged, like any other dirty answer: cut, it would
+     * look valid. Answers only carry length constraints.
+     *
+     * @param list<Anomaly> $anomalies
+     */
+    private function keepIfStorable(string $field, string $property, ?string $value, array &$anomalies): ?string
+    {
+        if (null === $value || $this->fits(Registration::class, $property, $value)) {
+            return $value;
+        }
+
+        $anomalies[] = new Anomaly($field, AnomalyCode::TooLong, $value);
+
+        return null;
+    }
+
+    private function keepStorableTimestamp(string $property, ?\DateTimeImmutable $timestamp): ?\DateTimeImmutable
+    {
+        return null !== $timestamp && $this->fits(Registration::class, $property, $timestamp) ? $timestamp : null;
+    }
+
+    /**
+     * A session the database cannot hold cannot be tied to anything. Its label and location are cut instead:
+     * they describe no one, and a session has no anomaly to keep the rest.
+     */
+    private function parseStorableSession(mixed $raw): ?SessionSnapshot
+    {
+        $session = self::parseSession($raw);
+        if (null === $session
+            || !$this->fits(Session::class, 'externalId', $session->externalId)
+            || !$this->fits(Session::class, 'date', $session->date)
+            || !$this->fits(Session::class, 'capacity', $session->capacity)) {
+            return null;
+        }
+
+        return new SessionSnapshot(
+            externalId: $session->externalId,
+            label: mb_substr($session->label, 0, Session::LABEL_LENGTH),
+            date: $session->date,
+            location: mb_substr($session->location, 0, Session::LOCATION_LENGTH),
+            capacity: $session->capacity,
+        );
     }
 
     private static function parseSession(mixed $raw): ?SessionSnapshot

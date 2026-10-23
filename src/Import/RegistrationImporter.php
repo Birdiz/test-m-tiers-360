@@ -11,6 +11,7 @@ use App\Repository\RegistrationRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 
 /**
@@ -30,6 +31,7 @@ final readonly class RegistrationImporter
         private ImportRunRepository $runs,
         private ClockInterface $clock,
         private LoggerInterface $logger,
+        private ValidatorInterface $validator,
     ) {
     }
 
@@ -67,6 +69,8 @@ final readonly class RegistrationImporter
         $unmatched = 0;
         try {
             foreach ($this->formApi->pages() as $page) {
+                // Checked before the page's transaction: an exception inside it closes the entity manager.
+                $this->assertStorableForm($page);
                 $totalChanged = $totalChanged || (null !== $total && $total !== $page->total);
                 $total ??= $page->total;
                 $operation = $this->entityManager->wrapInTransaction(function () use ($page, $run, &$unmatched): Operation {
@@ -161,15 +165,29 @@ final readonly class RegistrationImporter
         return $operation;
     }
 
+    /**
+     * Without a form id the database can hold, no registration can be tied to its operation (ADR 0014).
+     *
+     * @throws SourceUnreadable
+     */
+    private function assertStorableForm(SourcePage $page): void
+    {
+        if (str_contains($page->formId, "\0") || 0 !== \count($this->validator->validatePropertyValue(Operation::class, 'externalFormId', $page->formId))) {
+            throw new SourceUnreadable(\sprintf('The source serves a form id we cannot store: "%s".', $page->formId));
+        }
+    }
+
     private function upsertOperation(SourcePage $page): Operation
     {
+        // Describes no one, and an operation has no anomaly to keep the rest: cut to the column (ADR 0014).
+        $title = mb_substr(str_replace("\0", '', $page->formTitle), 0, Operation::TITLE_LENGTH);
         $operation = $this->entityManager->getRepository(Operation::class)->findOneBy(['externalFormId' => $page->formId]);
         if (null === $operation) {
-            $operation = new Operation($page->formId, $page->formTitle);
+            $operation = new Operation($page->formId, $title);
             $this->entityManager->persist($operation);
             $this->entityManager->flush();
         }
-        $operation->rename($page->formTitle);
+        $operation->rename($title);
 
         return $operation;
     }

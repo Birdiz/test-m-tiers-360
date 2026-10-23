@@ -6,6 +6,7 @@ use App\Import\RegistrationImporter;
 use App\Tests\Import\FakeFormApi;
 use App\Tests\Import\Submissions;
 use Doctrine\DBAL\Connection;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
@@ -46,6 +47,27 @@ final class SessionRegistrationsControllerTest extends WebTestCase
         $this->client->request('GET', '/api/sessions/ses_99/inscriptions', server: ['HTTP_AUTHORIZATION' => 'Bearer test-ops-token']);
 
         self::assertResponseStatusCodeSame(404);
+    }
+
+    /**
+     * The path is free text: no session can have these ids, and Postgres must never see bytes it rejects.
+     */
+    #[DataProvider('idsNoSessionCanHave')]
+    public function testIdNoSessionCanHaveIsNotFound(string $id): void
+    {
+        $this->client->request('GET', '/api/sessions/'.$id.'/inscriptions', server: ['HTTP_AUTHORIZATION' => 'Bearer test-ops-token']);
+
+        self::assertResponseStatusCodeSame(404);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function idsNoSessionCanHave(): iterable
+    {
+        yield 'NUL byte' => ['ses_01%00'];
+        yield 'invalid UTF-8' => ['ses_%FF'];
+        yield 'longer than any id' => [str_repeat('x', 65)];
     }
 
     public function testSessionRosterIsServedAsJsonWithoutBirthDates(): void
