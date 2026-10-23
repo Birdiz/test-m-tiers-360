@@ -34,6 +34,9 @@ are in `GLOSSARY.md`; use them in code, tests and docs. Read the relevant ADR be
 and record a new or reversed decision as a new ADR with the `domain-modeling` skill. Code and commits are in
 English, docs in French.
 
+Every PHP file starts with `declare(strict_types=1);` right after `<?php`, new files included. Check:
+`git ls-files '*.php' | xargs grep -L strict_types` must print nothing.
+
 ## Invariants
 
 - **Idempotent**: a registration is keyed by (form id, submission id), nothing else (ADR 0001). Re-running the

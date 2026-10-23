@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Import;
+declare(strict_types=1);
+
+namespace App\Import\Source;
 
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -15,21 +17,21 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * Retries are done here, not with the client's retry_failed: Symfony's RetryableHttpClient shares max_duration
  * across attempts, so a page cut for being too slow would never be retried (ADR 0011).
  */
-final class FormApi
+final readonly class FormApi
 {
     private const MAX_DELAY_MS = 30_000;
 
     public function __construct(
         #[Autowire(service: 'form_api.client')]
-        private readonly HttpClientInterface $client,
-        private readonly LoggerInterface $logger,
-        private readonly int $maxRetries,
-        private readonly int $retryDelayMs,
+        private HttpClientInterface $client,
+        private LoggerInterface $logger,
+        private int $maxRetries,
+        private int $retryDelayMs,
     ) {
     }
 
     /**
-     * @return \Generator<int, SourcePage>
+     * @return \Generator<int, SourcePageDto>
      *
      * @throws ExceptionInterface when a page still fails after the retries
      * @throws SourceUnreadable   when a page does not have the documented shape
@@ -47,7 +49,7 @@ final class FormApi
                 throw new SourceUnreadable(\sprintf('Page %d does not have the documented shape.', $page));
             }
 
-            yield new SourcePage($form['id'], \is_string($form['title'] ?? null) ? $form['title'] : $form['id'], $data, $meta['total']);
+            yield new SourcePageDto($form['id'], \is_string($form['title'] ?? null) ? $form['title'] : $form['id'], $data, $meta['total']);
 
             if ([] === $data || $page >= $meta['total_pages']) {
                 return;

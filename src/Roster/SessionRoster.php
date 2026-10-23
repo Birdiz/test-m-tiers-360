@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Roster;
 
 use App\Entity\Registration;
@@ -7,12 +9,12 @@ use App\Repository\ImportRunRepository;
 use App\Repository\RegistrationRepository;
 use App\Repository\SessionRepository;
 
-final class SessionRoster
+final readonly class SessionRoster
 {
     public function __construct(
-        private readonly SessionRepository $sessions,
-        private readonly RegistrationRepository $registrations,
-        private readonly ImportRunRepository $runs,
+        private SessionRepository $sessions,
+        private RegistrationRepository $registrations,
+        private ImportRunRepository $runs,
     ) {
     }
 
@@ -24,14 +26,31 @@ final class SessionRoster
         }
 
         $registrations = $this->registrations->findBySession($session);
-        $emails = array_values(array_unique(array_filter(array_map(static fn (Registration $r): ?string => $r->getEmail(), $registrations))));
 
         return Roster::of(
             $session,
             $registrations,
-            $this->registrations->findInOtherSessionsByEmails($session, $emails),
+            $this->registrations->findInOtherSessionsByEmails($session, self::distinctEmails($registrations)),
             $this->runs->lastFinished(),
             $this->runs->lastCompleted(),
         );
+    }
+
+    /**
+     * @param list<Registration> $registrations
+     *
+     * @return list<string>
+     */
+    private static function distinctEmails(array $registrations): array
+    {
+        $emails = [];
+        foreach ($registrations as $registration) {
+            $email = $registration->getEmail();
+            if (null !== $email && !\in_array($email, $emails, true)) {
+                $emails[] = $email;
+            }
+        }
+
+        return $emails;
     }
 }

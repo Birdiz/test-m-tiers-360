@@ -1,11 +1,13 @@
 <?php
 
-namespace App\Import;
+declare(strict_types=1);
+
+namespace App\Import\Submission;
 
 /**
  * The session as described inside a submission: the form API has no session endpoint.
  */
-final readonly class SessionSnapshot
+final readonly class SessionSnapshotDto
 {
     public function __construct(
         public string $externalId,
