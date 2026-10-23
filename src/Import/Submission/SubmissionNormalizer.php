@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Import;
+namespace App\Import\Submission;
 
-use App\Entity\RegistrationStatus;
-use App\Entity\StructureType;
+use App\Enum\RegistrationStatus;
+use App\Enum\StructureType;
 
 /**
  * Turns one submission of the form API into our vocabulary. Never rejects a dirty answer:

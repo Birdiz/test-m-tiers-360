@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Import;
+namespace App\Import\Submission;
 
 enum AnomalyCode: string
 {

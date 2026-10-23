@@ -2,12 +2,12 @@
 
 namespace App\Tests\Import;
 
-use App\Entity\RegistrationStatus;
-use App\Entity\StructureType;
-use App\Import\SubmissionNormalizer;
-use App\Import\UnreadableSubmission;
-use App\Import\Anomaly;
-use App\Import\AnomalyCode;
+use App\Enum\RegistrationStatus;
+use App\Enum\StructureType;
+use App\Import\Submission\SubmissionNormalizer;
+use App\Import\Submission\UnreadableSubmission;
+use App\Import\Submission\Anomaly;
+use App\Import\Submission\AnomalyCode;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

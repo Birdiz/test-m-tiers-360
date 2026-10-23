@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Import;
+namespace App\Import\Source;
 
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;

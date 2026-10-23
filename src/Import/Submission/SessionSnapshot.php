@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Import;
+namespace App\Import\Submission;
 
 /**
  * The session as described inside a submission: the form API has no session endpoint.

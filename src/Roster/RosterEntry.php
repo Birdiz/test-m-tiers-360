@@ -2,8 +2,8 @@
 
 namespace App\Roster;
 
-use App\Entity\StructureType;
-use App\Import\Anomaly;
+use App\Enum\StructureType;
+use App\Import\Submission\Anomaly;
 
 /**
  * An active registration as the ops team reads it.

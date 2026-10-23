@@ -2,7 +2,7 @@
 
 namespace App\Tests\Import;
 
-use App\Entity\ImportRunStatus;
+use App\Enum\ImportRunStatus;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class RegistrationImporterTest extends ImportTestCase

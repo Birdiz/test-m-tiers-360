@@ -2,7 +2,7 @@
 
 namespace App\Command;
 
-use App\Entity\ImportRunStatus;
+use App\Enum\ImportRunStatus;
 use App\Import\RegistrationImporter;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;

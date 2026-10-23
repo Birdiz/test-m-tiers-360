@@ -2,9 +2,11 @@
 
 namespace App\Entity;
 
-use App\Import\Anomaly;
-use App\Import\AnomalyCode;
-use App\Import\NormalizedSubmission;
+use App\Enum\RegistrationStatus;
+use App\Enum\StructureType;
+use App\Import\Submission\Anomaly;
+use App\Import\Submission\AnomalyCode;
+use App\Import\Submission\NormalizedSubmission;
 use App\Repository\RegistrationRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
