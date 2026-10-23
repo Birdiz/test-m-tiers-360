@@ -25,7 +25,7 @@ final readonly class SubmissionNormalizer
     /**
      * @param mixed $submission one entry of a page's data, as decoded: nothing guarantees it is an object
      */
-    public function normalize(mixed $submission): NormalizedSubmission
+    public function normalize(mixed $submission): NormalizedSubmissionDto
     {
         if (!\is_array($submission)) {
             throw new UnreadableSubmission('not an object');
@@ -43,7 +43,7 @@ final readonly class SubmissionNormalizer
         $session = $this->parseStorableSession($answers['session'] ?? null) ?? throw new UnreadableSubmission('no readable session', $externalId);
         $anomalies = [];
 
-        return new NormalizedSubmission(
+        return new NormalizedSubmissionDto(
             externalId: $externalId,
             status: $status,
             sourceCreatedAt: $createdAt,
@@ -222,7 +222,7 @@ final readonly class SubmissionNormalizer
      * A session the database cannot hold cannot be tied to anything. Its label and location are cut instead:
      * they describe no one, and a session has no anomaly to keep the rest.
      */
-    private function parseStorableSession(mixed $raw): ?SessionSnapshot
+    private function parseStorableSession(mixed $raw): ?SessionSnapshotDto
     {
         $session = self::parseSession($raw);
         if (null === $session
@@ -232,7 +232,7 @@ final readonly class SubmissionNormalizer
             return null;
         }
 
-        return new SessionSnapshot(
+        return new SessionSnapshotDto(
             externalId: $session->externalId,
             label: mb_substr($session->label, 0, Session::LABEL_LENGTH),
             date: $session->date,
@@ -241,7 +241,7 @@ final readonly class SubmissionNormalizer
         );
     }
 
-    private static function parseSession(mixed $raw): ?SessionSnapshot
+    private static function parseSession(mixed $raw): ?SessionSnapshotDto
     {
         if (!\is_array($raw) || null === $id = self::trimToNull($raw['id'] ?? null)) {
             return null;
@@ -252,7 +252,7 @@ final readonly class SubmissionNormalizer
             return null;
         }
 
-        return new SessionSnapshot(
+        return new SessionSnapshotDto(
             externalId: $id,
             label: self::trimToNull($raw['label'] ?? null) ?? $id,
             date: $date,

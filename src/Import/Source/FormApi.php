@@ -29,7 +29,7 @@ final readonly class FormApi
     }
 
     /**
-     * @return \Generator<int, SourcePage>
+     * @return \Generator<int, SourcePageDto>
      *
      * @throws ExceptionInterface when a page still fails after the retries
      * @throws SourceUnreadable   when a page does not have the documented shape
@@ -47,7 +47,7 @@ final readonly class FormApi
                 throw new SourceUnreadable(\sprintf('Page %d does not have the documented shape.', $page));
             }
 
-            yield new SourcePage($form['id'], \is_string($form['title'] ?? null) ? $form['title'] : $form['id'], $data, $meta['total']);
+            yield new SourcePageDto($form['id'], \is_string($form['title'] ?? null) ? $form['title'] : $form['id'], $data, $meta['total']);
 
             if ([] === $data || $page >= $meta['total_pages']) {
                 return;

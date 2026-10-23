@@ -2,7 +2,7 @@
 
 namespace App\Entity;
 
-use App\Import\Submission\SessionSnapshot;
+use App\Import\Submission\SessionSnapshotDto;
 use App\Repository\SessionRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -49,7 +49,7 @@ class Session
         #[ORM\Column(length: self::EXTERNAL_ID_LENGTH)]
         #[Assert\Length(max: self::EXTERNAL_ID_LENGTH)]
         private string $externalId,
-        SessionSnapshot $snapshot,
+        SessionSnapshotDto $snapshot,
     ) {
         $this->describe($snapshot);
     }
@@ -57,7 +57,7 @@ class Session
     /**
      * The form API has no session endpoint: details come from the snapshots inside submissions.
      */
-    public function describe(SessionSnapshot $snapshot): void
+    public function describe(SessionSnapshotDto $snapshot): void
     {
         $this->label = $snapshot->label;
         $this->date = $snapshot->date;

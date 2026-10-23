@@ -2,7 +2,7 @@
 
 namespace App\Import\Source;
 
-final readonly class SourcePage
+final readonly class SourcePageDto
 {
     /**
      * @param list<mixed> $submissions raw submissions, as served: each one is checked by SubmissionNormalizer

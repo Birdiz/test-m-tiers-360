@@ -5,7 +5,7 @@ namespace App\Import\Submission;
 use App\Enum\RegistrationStatus;
 use App\Enum\StructureType;
 
-final readonly class NormalizedSubmission
+final readonly class NormalizedSubmissionDto
 {
     /**
      * @param list<Anomaly> $anomalies
@@ -23,7 +23,7 @@ final readonly class NormalizedSubmission
         public StructureType $structureType,
         public ?string $structureName,
         public ?string $comment,
-        public SessionSnapshot $session,
+        public SessionSnapshotDto $session,
         public array $anomalies,
     ) {
     }

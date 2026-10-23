@@ -6,7 +6,7 @@ use App\Enum\RegistrationStatus;
 use App\Enum\StructureType;
 use App\Import\Submission\Anomaly;
 use App\Import\Submission\AnomalyCode;
-use App\Import\Submission\NormalizedSubmission;
+use App\Import\Submission\NormalizedSubmissionDto;
 use App\Repository\RegistrationRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -106,7 +106,7 @@ class Registration
         #[ORM\Column(length: self::EXTERNAL_ID_LENGTH)]
         #[Assert\Length(max: self::EXTERNAL_ID_LENGTH)]
         private string $externalId,
-        NormalizedSubmission $submission,
+        NormalizedSubmissionDto $submission,
         Session $session,
         int $runId,
     ) {
@@ -120,7 +120,7 @@ class Registration
      *
      * @return bool whether the source version was applied
      */
-    public function seenInSource(NormalizedSubmission $submission, Session $session, int $runId): bool
+    public function seenInSource(NormalizedSubmissionDto $submission, Session $session, int $runId): bool
     {
         $this->stillInSource($runId);
 
@@ -145,7 +145,7 @@ class Registration
         $this->removedAt = null;
     }
 
-    private function copy(NormalizedSubmission $submission, Session $session): void
+    private function copy(NormalizedSubmissionDto $submission, Session $session): void
     {
         $this->session = $session;
         $this->status = $submission->status;

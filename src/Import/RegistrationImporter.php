@@ -7,9 +7,9 @@ use App\Entity\Operation;
 use App\Entity\Registration;
 use App\Entity\Session;
 use App\Import\Source\FormApi;
-use App\Import\Source\SourcePage;
+use App\Import\Source\SourcePageDto;
 use App\Import\Source\SourceUnreadable;
-use App\Import\Submission\SessionSnapshot;
+use App\Import\Submission\SessionSnapshotDto;
 use App\Import\Submission\SubmissionNormalizer;
 use App\Import\Submission\UnreadableSubmission;
 use App\Repository\ImportRunRepository;
@@ -125,7 +125,7 @@ final readonly class RegistrationImporter
         }
     }
 
-    private function applyPage(SourcePage $page, ImportRun $run, int &$unmatched): Operation
+    private function applyPage(SourcePageDto $page, ImportRun $run, int &$unmatched): Operation
     {
         $operation = $this->upsertOperation($page);
         $runId = (int) $run->getId();
@@ -176,14 +176,14 @@ final readonly class RegistrationImporter
      *
      * @throws SourceUnreadable
      */
-    private function assertStorableForm(SourcePage $page): void
+    private function assertStorableForm(SourcePageDto $page): void
     {
         if (str_contains($page->formId, "\0") || 0 !== \count($this->validator->validatePropertyValue(Operation::class, 'externalFormId', $page->formId))) {
             throw new SourceUnreadable(\sprintf('The source serves a form id we cannot store: "%s".', $page->formId));
         }
     }
 
-    private function upsertOperation(SourcePage $page): Operation
+    private function upsertOperation(SourcePageDto $page): Operation
     {
         // Describes no one, and an operation has no anomaly to keep the rest: cut to the column (ADR 0014).
         $title = mb_substr(str_replace("\0", '', $page->formTitle), 0, Operation::TITLE_LENGTH);
@@ -198,7 +198,7 @@ final readonly class RegistrationImporter
         return $operation;
     }
 
-    private function upsertSession(Operation $operation, SessionSnapshot $snapshot): Session
+    private function upsertSession(Operation $operation, SessionSnapshotDto $snapshot): Session
     {
         $session = $this->entityManager->getRepository(Session::class)->findOneBy(['operation' => $operation, 'externalId' => $snapshot->externalId]);
         if (null === $session) {
