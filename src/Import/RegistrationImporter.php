@@ -19,16 +19,16 @@ use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
  *
  * Never throws on a source failure: the returned run says how it ended.
  */
-final class RegistrationImporter
+final readonly class RegistrationImporter
 {
     public function __construct(
-        private readonly FormApi $formApi,
-        private readonly SubmissionNormalizer $normalizer,
-        private readonly EntityManagerInterface $entityManager,
-        private readonly RegistrationRepository $registrations,
-        private readonly ImportRunRepository $runs,
-        private readonly ClockInterface $clock,
-        private readonly LoggerInterface $logger,
+        private FormApi $formApi,
+        private SubmissionNormalizer $normalizer,
+        private EntityManagerInterface $entityManager,
+        private RegistrationRepository $registrations,
+        private ImportRunRepository $runs,
+        private ClockInterface $clock,
+        private LoggerInterface $logger,
     ) {
     }
 

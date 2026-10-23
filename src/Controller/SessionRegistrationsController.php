@@ -9,10 +9,10 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[AsController]
-final class SessionRegistrationsController
+final readonly class SessionRegistrationsController
 {
     public function __construct(
-        private readonly SessionRoster $roster,
+        private SessionRoster $roster,
     ) {
     }
 

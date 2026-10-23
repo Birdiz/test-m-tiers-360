@@ -10,11 +10,11 @@ use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
 /**
  * One shared token for the ops team's API, until there is real identity (SSO, per-user roles).
  */
-final class OpsTokenHandler implements AccessTokenHandlerInterface
+final readonly class OpsTokenHandler implements AccessTokenHandlerInterface
 {
     public function __construct(
         #[Autowire(env: 'OPS_API_TOKEN')]
-        private readonly string $opsToken,
+        private string $opsToken,
     ) {
     }
 

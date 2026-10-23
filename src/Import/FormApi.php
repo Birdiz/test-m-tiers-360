@@ -15,16 +15,16 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * Retries are done here, not with the client's retry_failed: Symfony's RetryableHttpClient shares max_duration
  * across attempts, so a page cut for being too slow would never be retried (ADR 0011).
  */
-final class FormApi
+final readonly class FormApi
 {
     private const MAX_DELAY_MS = 30_000;
 
     public function __construct(
         #[Autowire(service: 'form_api.client')]
-        private readonly HttpClientInterface $client,
-        private readonly LoggerInterface $logger,
-        private readonly int $maxRetries,
-        private readonly int $retryDelayMs,
+        private HttpClientInterface $client,
+        private LoggerInterface $logger,
+        private int $maxRetries,
+        private int $retryDelayMs,
     ) {
     }
 
