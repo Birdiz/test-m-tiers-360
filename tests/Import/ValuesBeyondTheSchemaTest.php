@@ -44,7 +44,7 @@ final class ValuesBeyondTheSchemaTest extends ImportTestCase
 
         self::assertSame(ImportRunStatus::Completed, $run->getStatus(), (string) $run->getReason());
         self::assertSame([
-            ['submission' => $longId, 'reason' => 'id longer than 64 characters'],
+            ['submission' => $longId, 'reason' => 'id our database cannot hold'],
             ['submission' => 'sub_long_session', 'reason' => 'no readable session'],
             ['submission' => 'sub_capacity', 'reason' => 'no readable session'],
             ['submission' => 'sub_year_zero', 'reason' => 'no readable session'],

@@ -6,15 +6,22 @@ use App\Entity\Registration;
 use App\Entity\RegistrationStatus;
 use App\Entity\Session;
 use App\Entity\StructureType;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 /**
  * Turns one submission of the form API into our vocabulary. Never rejects a dirty answer:
  * the field is left empty and an anomaly says why (ADR 0003).
  *
- * The only gate before the database: what it returns fits our columns (ADR 0014).
+ * Each value is checked against the constraints of the entity property it ends up in, which mirror the
+ * database columns: what it returns can be stored (ADR 0014).
  */
 final class SubmissionNormalizer
 {
+    public function __construct(
+        private readonly ValidatorInterface $validator,
+    ) {
+    }
+
     /**
      * @param array<string, mixed> $submission
      */
@@ -22,14 +29,14 @@ final class SubmissionNormalizer
     {
         $answers = \is_array($submission['answers'] ?? null) ? $submission['answers'] : [];
         $externalId = self::optionalText($submission['id'] ?? null) ?? throw new UnreadableSubmission('no id');
-        if (mb_strlen($externalId) > Registration::EXTERNAL_ID_LENGTH) {
-            throw new UnreadableSubmission(\sprintf('id longer than %d characters', Registration::EXTERNAL_ID_LENGTH), $externalId);
+        if (!$this->fits(Registration::class, 'externalId', $externalId)) {
+            throw new UnreadableSubmission('id our database cannot hold', $externalId);
         }
         $status = RegistrationStatus::tryFrom(\is_string($submission['status'] ?? null) ? $submission['status'] : '')
             ?? throw new UnreadableSubmission('unknown status', $externalId);
-        $createdAt = self::timestamp($submission['created_at'] ?? null) ?? throw new UnreadableSubmission('unreadable created_at', $externalId);
-        $updatedAt = self::timestamp($submission['updated_at'] ?? null) ?? throw new UnreadableSubmission('unreadable updated_at', $externalId);
-        $session = self::session($answers['session'] ?? null) ?? throw new UnreadableSubmission('no readable session', $externalId);
+        $createdAt = $this->storable('sourceCreatedAt', self::timestamp($submission['created_at'] ?? null)) ?? throw new UnreadableSubmission('unreadable created_at', $externalId);
+        $updatedAt = $this->storable('sourceUpdatedAt', self::timestamp($submission['updated_at'] ?? null)) ?? throw new UnreadableSubmission('unreadable updated_at', $externalId);
+        $session = $this->session($answers['session'] ?? null) ?? throw new UnreadableSubmission('no readable session', $externalId);
         $anomalies = [];
 
         return new NormalizedSubmission(
@@ -37,13 +44,13 @@ final class SubmissionNormalizer
             status: $status,
             sourceCreatedAt: $createdAt,
             sourceUpdatedAt: $updatedAt,
-            firstName: self::name('first_name', $answers['first_name'] ?? null, $anomalies),
-            lastName: self::name('last_name', $answers['last_name'] ?? null, $anomalies),
-            email: self::email($answers['email'] ?? null, $anomalies),
-            phone: self::phone($answers['phone'] ?? null, $anomalies),
+            firstName: $this->fitting('first_name', 'firstName', self::name('first_name', $answers['first_name'] ?? null, $anomalies), $anomalies) ?? '',
+            lastName: $this->fitting('last_name', 'lastName', self::name('last_name', $answers['last_name'] ?? null, $anomalies), $anomalies) ?? '',
+            email: $this->fitting('email', 'email', self::email($answers['email'] ?? null, $anomalies), $anomalies),
+            phone: $this->fitting('phone', 'phone', self::phone($answers['phone'] ?? null, $anomalies), $anomalies),
             birthDate: self::birthDate($answers['birth_date'] ?? null, $createdAt, $anomalies),
             structureType: self::structureType($answers['structure_type'] ?? null, $anomalies),
-            structureName: self::structureName($answers['structure_name'] ?? null, $anomalies),
+            structureName: $this->fitting('structure_name', 'structureName', self::structureName($answers['structure_name'] ?? null, $anomalies), $anomalies),
             comment: self::optionalText($answers['comment'] ?? null),
             session: $session,
             anomalies: $anomalies,
@@ -162,7 +169,7 @@ final class SubmissionNormalizer
             $anomalies[] = new Anomaly('structure_name', AnomalyCode::Missing, null);
         }
 
-        return self::fitting('structure_name', $name, Registration::STRUCTURE_NAME_LENGTH, $anomalies);
+        return $name;
     }
 
     /**
@@ -176,14 +183,24 @@ final class SubmissionNormalizer
     }
 
     /**
-     * An answer longer than its column is left empty and flagged, like any other dirty answer: cut, it would
-     * look valid.
+     * Whether the database can hold this value in that entity property (ADR 0014).
+     *
+     * @param class-string $entity
+     */
+    private function fits(string $entity, string $property, mixed $value): bool
+    {
+        return 0 === \count($this->validator->validatePropertyValue($entity, $property, $value));
+    }
+
+    /**
+     * An answer the database cannot hold is left empty and flagged, like any other dirty answer: cut, it would
+     * look valid. Answers only carry length constraints.
      *
      * @param list<Anomaly> $anomalies
      */
-    private static function fitting(string $field, ?string $value, int $length, array &$anomalies): ?string
+    private function fitting(string $field, string $property, ?string $value, array &$anomalies): ?string
     {
-        if (null === $value || mb_strlen($value) <= $length) {
+        if (null === $value || $this->fits(Registration::class, $property, $value)) {
             return $value;
         }
 
@@ -192,33 +209,51 @@ final class SubmissionNormalizer
         return null;
     }
 
-    /**
-     * Postgres has no year 0 nor any year before it.
-     */
-    private static function storable(?\DateTimeImmutable $date): ?\DateTimeImmutable
+    private function storable(string $property, ?\DateTimeImmutable $timestamp): ?\DateTimeImmutable
     {
-        return null !== $date && (int) $date->format('Y') >= 1 ? $date : null;
+        return null !== $timestamp && $this->fits(Registration::class, $property, $timestamp) ? $timestamp : null;
     }
 
-    private static function session(mixed $raw): ?SessionSnapshot
+    /**
+     * A session the database cannot hold cannot be tied to anything. Its label and location are cut instead:
+     * they describe no one, and a session has no anomaly to keep the rest.
+     */
+    private function session(mixed $raw): ?SessionSnapshot
+    {
+        $session = self::readSession($raw);
+        if (null === $session
+            || !$this->fits(Session::class, 'externalId', $session->externalId)
+            || !$this->fits(Session::class, 'date', $session->date)
+            || !$this->fits(Session::class, 'capacity', $session->capacity)) {
+            return null;
+        }
+
+        return new SessionSnapshot(
+            externalId: $session->externalId,
+            label: mb_substr($session->label, 0, Session::LABEL_LENGTH),
+            date: $session->date,
+            location: mb_substr($session->location, 0, Session::LOCATION_LENGTH),
+            capacity: $session->capacity,
+        );
+    }
+
+    private static function readSession(mixed $raw): ?SessionSnapshot
     {
         if (!\is_array($raw) || null === $id = self::optionalText($raw['id'] ?? null)) {
             return null;
         }
 
-        $date = self::storable(\is_string($raw['date'] ?? null) ? self::strictDate($raw['date'], 'Y-m-d') : null);
-        $capacity = $raw['capacity'] ?? null;
-        if (mb_strlen($id) > Session::EXTERNAL_ID_LENGTH || null === $date || !\is_int($capacity) || $capacity > Session::MAX_CAPACITY) {
+        $date = \is_string($raw['date'] ?? null) ? self::strictDate($raw['date'], 'Y-m-d') : null;
+        if (null === $date || !\is_int($raw['capacity'] ?? null)) {
             return null;
         }
 
-        // Descriptive, carries no personal data, and has no anomaly to hold the rest: cut to the column.
         return new SessionSnapshot(
             externalId: $id,
-            label: mb_substr(self::optionalText($raw['label'] ?? null) ?? $id, 0, Session::LABEL_LENGTH),
+            label: self::optionalText($raw['label'] ?? null) ?? $id,
             date: $date,
-            location: mb_substr(self::optionalText($raw['location'] ?? null) ?? '', 0, Session::LOCATION_LENGTH),
-            capacity: $capacity,
+            location: self::optionalText($raw['location'] ?? null) ?? '',
+            capacity: $raw['capacity'],
         );
     }
 
@@ -230,7 +265,7 @@ final class SubmissionNormalizer
 
         $timestamp = \DateTimeImmutable::createFromFormat(\DATE_ATOM, str_replace('Z', '+00:00', $raw));
 
-        return self::storable(false === $timestamp ? null : $timestamp);
+        return false === $timestamp ? null : $timestamp;
     }
 
     /**
@@ -243,6 +278,6 @@ final class SubmissionNormalizer
             $anomalies[] = new Anomaly($field, AnomalyCode::Missing, null);
         }
 
-        return self::fitting($field, $name, Registration::NAME_LENGTH, $anomalies) ?? '';
+        return $name ?? '';
     }
 }

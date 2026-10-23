@@ -8,9 +8,12 @@ use App\Import\NormalizedSubmission;
 use App\Repository\RegistrationRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * Owned by the import: every field comes from the source (ADR 0007).
+ *
+ * Its constraints are the database's, nothing more: what the column cannot hold (ADR 0014).
  */
 #[ORM\Entity(repositoryClass: RegistrationRepository::class)]
 #[ORM\UniqueConstraint(columns: ['operation_id', 'external_id'])]
@@ -19,7 +22,11 @@ class Registration
 {
     public const EXTERNAL_ID_LENGTH = 64;
     public const NAME_LENGTH = 255;
+    public const EMAIL_LENGTH = 255;
+    public const PHONE_LENGTH = 32;
     public const STRUCTURE_NAME_LENGTH = 255;
+    /** Postgres has no year 0 nor any year before it, as Doctrine writes dates. */
+    private const FIRST_STORABLE_DAY = '0001-01-01';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -34,9 +41,11 @@ class Registration
     private RegistrationStatus $status;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[Assert\GreaterThanOrEqual(self::FIRST_STORABLE_DAY)]
     private \DateTimeImmutable $sourceCreatedAt;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[Assert\GreaterThanOrEqual(self::FIRST_STORABLE_DAY)]
     private \DateTimeImmutable $sourceUpdatedAt;
 
     /**
@@ -47,24 +56,30 @@ class Registration
     private \DateTimeImmutable $joinedSessionAt;
 
     #[ORM\Column(length: self::NAME_LENGTH)]
+    #[Assert\Length(max: self::NAME_LENGTH)]
     private string $firstName;
 
     #[ORM\Column(length: self::NAME_LENGTH)]
+    #[Assert\Length(max: self::NAME_LENGTH)]
     private string $lastName;
 
-    #[ORM\Column(length: 255, nullable: true)]
+    #[ORM\Column(length: self::EMAIL_LENGTH, nullable: true)]
+    #[Assert\Length(max: self::EMAIL_LENGTH)]
     private ?string $email;
 
-    #[ORM\Column(length: 32, nullable: true)]
+    #[ORM\Column(length: self::PHONE_LENGTH, nullable: true)]
+    #[Assert\Length(max: self::PHONE_LENGTH)]
     private ?string $phone;
 
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
+    #[Assert\GreaterThanOrEqual(self::FIRST_STORABLE_DAY)]
     private ?\DateTimeImmutable $birthDate;
 
     #[ORM\Column(length: 32, enumType: StructureType::class)]
     private StructureType $structureType;
 
     #[ORM\Column(length: self::STRUCTURE_NAME_LENGTH, nullable: true)]
+    #[Assert\Length(max: self::STRUCTURE_NAME_LENGTH)]
     private ?string $structureName;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
@@ -87,6 +102,7 @@ class Registration
         #[ORM\JoinColumn(nullable: false)]
         private Operation $operation,
         #[ORM\Column(length: self::EXTERNAL_ID_LENGTH)]
+        #[Assert\Length(max: self::EXTERNAL_ID_LENGTH)]
         private string $externalId,
         NormalizedSubmission $submission,
         Session $session,

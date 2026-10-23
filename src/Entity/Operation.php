@@ -3,9 +3,12 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * One form of the external tool = one operation.
+ *
+ * Its constraints are the database's, nothing more: what the column cannot hold (ADR 0014).
  */
 #[ORM\Entity]
 #[ORM\UniqueConstraint(columns: ['external_form_id'])]
@@ -21,8 +24,10 @@ class Operation
 
     public function __construct(
         #[ORM\Column(length: self::EXTERNAL_ID_LENGTH)]
+        #[Assert\Length(max: self::EXTERNAL_ID_LENGTH)]
         private string $externalFormId,
         #[ORM\Column(length: self::TITLE_LENGTH)]
+        #[Assert\Length(max: self::TITLE_LENGTH)]
         private string $title,
     ) {
     }

@@ -10,12 +10,21 @@ use App\Import\Anomaly;
 use App\Import\AnomalyCode;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Validator\Validation;
 
 final class SubmissionNormalizerTest extends TestCase
 {
+    /**
+     * With the entities' constraints, as in the application.
+     */
+    private static function normalizer(): SubmissionNormalizer
+    {
+        return new SubmissionNormalizer(Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator());
+    }
+
     public function testCleanSubmissionIsNormalizedWithoutAnomaly(): void
     {
-        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission());
+        $normalized = self::normalizer()->normalize(Submissions::submission());
 
         self::assertSame('sub_k3m9qz7tpe', $normalized->externalId);
         self::assertSame(RegistrationStatus::Submitted, $normalized->status);
@@ -37,7 +46,7 @@ final class SubmissionNormalizerTest extends TestCase
     #[DataProvider('emails')]
     public function testEmailIsTrimmedAndLowercasedOrFlagged(mixed $raw, ?string $expected, ?Anomaly $anomaly): void
     {
-        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission(['email' => $raw]));
+        $normalized = self::normalizer()->normalize(Submissions::submission(['email' => $raw]));
 
         self::assertSame($expected, $normalized->email);
         self::assertEquals(null === $anomaly ? [] : [$anomaly], $normalized->anomalies);
@@ -61,7 +70,7 @@ final class SubmissionNormalizerTest extends TestCase
         $submission = Submissions::submission();
         unset($submission['answers']['email']);
 
-        $normalized = (new SubmissionNormalizer())->normalize($submission);
+        $normalized = self::normalizer()->normalize($submission);
 
         self::assertNull($normalized->email);
         self::assertEquals([new Anomaly('email', AnomalyCode::Missing, null)], $normalized->anomalies);
@@ -70,7 +79,7 @@ final class SubmissionNormalizerTest extends TestCase
     #[DataProvider('phones')]
     public function testFrenchPhoneIsNormalizedToInternationalFormatOrFlagged(?string $raw, ?string $expected, ?Anomaly $anomaly): void
     {
-        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission(['phone' => $raw]));
+        $normalized = self::normalizer()->normalize(Submissions::submission(['phone' => $raw]));
 
         self::assertSame($expected, $normalized->phone);
         self::assertEquals(null === $anomaly ? [] : [$anomaly], $normalized->anomalies);
@@ -94,7 +103,7 @@ final class SubmissionNormalizerTest extends TestCase
     public function testBirthDateIsReadOrFlagged(mixed $raw, ?string $expected, ?Anomaly $anomaly): void
     {
         // Submitted on 2026-09-14.
-        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission(['birth_date' => $raw]));
+        $normalized = self::normalizer()->normalize(Submissions::submission(['birth_date' => $raw]));
 
         self::assertSame($expected, $normalized->birthDate?->format('Y-m-d'));
         self::assertEquals(null === $anomaly ? [] : [$anomaly], $normalized->anomalies);
@@ -116,7 +125,7 @@ final class SubmissionNormalizerTest extends TestCase
     #[DataProvider('structureTypes')]
     public function testStructureTypeOutsideTheFormListIsKeptAsOther(string $raw, Anomaly $anomaly): void
     {
-        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission(['structure_type' => $raw]));
+        $normalized = self::normalizer()->normalize(Submissions::submission(['structure_type' => $raw]));
 
         self::assertSame(StructureType::Other, $normalized->structureType);
         self::assertEquals([$anomaly], $normalized->anomalies);
@@ -134,7 +143,7 @@ final class SubmissionNormalizerTest extends TestCase
 
     public function testMissingStructureNameIsFlagged(): void
     {
-        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission(['structure_name' => null]));
+        $normalized = self::normalizer()->normalize(Submissions::submission(['structure_name' => null]));
 
         self::assertNull($normalized->structureName);
         self::assertEquals([new Anomaly('structure_name', AnomalyCode::Missing, null)], $normalized->anomalies);
@@ -142,7 +151,7 @@ final class SubmissionNormalizerTest extends TestCase
 
     public function testMissingNameIsFlagged(): void
     {
-        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission(['last_name' => null]));
+        $normalized = self::normalizer()->normalize(Submissions::submission(['last_name' => null]));
 
         self::assertSame('', $normalized->lastName);
         self::assertEquals([new Anomaly('last_name', AnomalyCode::Missing, null)], $normalized->anomalies);
@@ -150,7 +159,7 @@ final class SubmissionNormalizerTest extends TestCase
 
     public function testFreeTextIsTrimmedAndBlankCommentIsDropped(): void
     {
-        $normalized = (new SubmissionNormalizer())->normalize(Submissions::submission([
+        $normalized = self::normalizer()->normalize(Submissions::submission([
             'first_name' => ' Léa ',
             'last_name' => 'Martin ',
             'structure_name' => ' Lycée des Quatre-Vallées',
@@ -173,7 +182,7 @@ final class SubmissionNormalizerTest extends TestCase
     {
         $this->expectException(UnreadableSubmission::class);
 
-        (new SubmissionNormalizer())->normalize($submission);
+        self::normalizer()->normalize($submission);
     }
 
     /**
