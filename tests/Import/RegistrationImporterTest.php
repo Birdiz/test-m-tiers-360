@@ -224,6 +224,28 @@ final class RegistrationImporterTest extends ImportTestCase
         self::assertSame([3, 2], [$run->getSeen(), $run->getUnreadable()]);
     }
 
+    public function testUnreadableSubmissionReadTwiceIsSeenOnce(): void
+    {
+        // 30 submissions; the last of page 1 has no session, and no registration matches it.
+        $submissions = [];
+        for ($i = 0; $i < 30; ++$i) {
+            $submissions[] = Submissions::submission(submission: ['id' => \sprintf('sub_%02d', $i)]);
+        }
+        $submissions[24]['answers']['session'] = null;
+        $this->formApi()->serve($submissions);
+        // After page 1 is read, one submission arrives first and the last one is deleted: the total stays at 30,
+        // but page 2 now starts one submission earlier, so the unreadable one is read again and the newcomer never is.
+        $this->formApi()->changeAfterPage(1, static fn (array $submissions): array => [
+            Submissions::submission(submission: ['id' => 'sub_newcomer']),
+            ...\array_slice($submissions, 0, -1),
+        ]);
+
+        $run = $this->runImport();
+
+        self::assertSame(ImportRunStatus::Incomplete, $run->getStatus());
+        self::assertSame(29, $run->getSeen());
+    }
+
     public function testOlderVersionThanTheOneKnownIsIgnored(): void
     {
         $submission = Submissions::submission(submission: ['status' => 'cancelled', 'updated_at' => '2026-10-02T09:00:00Z']);
