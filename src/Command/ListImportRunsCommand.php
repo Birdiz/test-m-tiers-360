@@ -31,7 +31,13 @@ final class ListImportRunsCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-        $runs = $this->runs->findBy([], ['id' => 'DESC'], max(1, (int) $input->getOption('limit')));
+        $limit = filter_var($input->getOption('limit'), \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if (false === $limit) {
+            $io->error('--limit must be a positive integer.');
+
+            return Command::INVALID;
+        }
+        $runs = $this->runs->findBy([], ['id' => 'DESC'], $limit);
 
         $io->table(
             ['#', 'Started', 'Status', 'Seen', 'Created', 'Updated', 'Removed', 'Unreadable', 'Reason'],

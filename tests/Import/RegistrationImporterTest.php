@@ -136,6 +136,20 @@ final class RegistrationImporterTest extends ImportTestCase
         ], $run->getProblems());
     }
 
+    public function testSubmissionThatIsNotAnObjectIsReportedAsUnreadable(): void
+    {
+        $this->formApi()->script(1, new MockResponse(json_encode([
+            'form' => ['id' => 'frm_7Hq2xL', 'title' => 'Découvrir les métiers en réalité virtuelle — Ain, novembre 2026'],
+            'data' => [Submissions::submission(), null],
+            'meta' => ['page' => 1, 'per_page' => 25, 'total' => 2, 'total_pages' => 1],
+        ], \JSON_THROW_ON_ERROR), ['http_code' => 200, 'response_headers' => ['content-type' => 'application/json']]));
+
+        $run = $this->runImport();
+
+        self::assertSame(ImportRunStatus::Completed, $run->getStatus());
+        self::assertSame([['submission' => null, 'reason' => 'not an object']], $run->getProblems());
+    }
+
     public function testRegistrationSkippedByAPageShiftIsNotRemoved(): void
     {
         $this->formApi()->serveDataset('submissions-v1.json');

@@ -12,10 +12,14 @@ use App\Entity\StructureType;
 final class SubmissionNormalizer
 {
     /**
-     * @param array<string, mixed> $submission
+     * @param mixed $submission one entry of a page's data, as decoded: nothing guarantees it is an object
      */
-    public function normalize(array $submission): NormalizedSubmission
+    public function normalize(mixed $submission): NormalizedSubmission
     {
+        if (!\is_array($submission)) {
+            throw new UnreadableSubmission('not an object');
+        }
+
         $answers = \is_array($submission['answers'] ?? null) ? $submission['answers'] : [];
         $externalId = self::optionalText($submission['id'] ?? null) ?? throw new UnreadableSubmission('no id');
         $status = RegistrationStatus::tryFrom(\is_string($submission['status'] ?? null) ? $submission['status'] : '')
