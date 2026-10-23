@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Gives phpstan-doctrine the entity manager, so it checks the DQL and infers what queries return (ADR 0015).
 
 use App\Kernel;
