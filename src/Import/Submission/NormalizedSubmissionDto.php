@@ -1,11 +1,13 @@
 <?php
 
-namespace App\Import;
+declare(strict_types=1);
 
-use App\Entity\RegistrationStatus;
-use App\Entity\StructureType;
+namespace App\Import\Submission;
 
-final readonly class NormalizedSubmission
+use App\Enum\RegistrationStatus;
+use App\Enum\StructureType;
+
+final readonly class NormalizedSubmissionDto
 {
     /**
      * @param list<Anomaly> $anomalies
@@ -23,7 +25,7 @@ final readonly class NormalizedSubmission
         public StructureType $structureType,
         public ?string $structureName,
         public ?string $comment,
-        public SessionSnapshot $session,
+        public SessionSnapshotDto $session,
         public array $anomalies,
     ) {
     }

@@ -12,6 +12,9 @@ how the import identifies, removes, flags or ranks registrations, or which data 
 it; record a new or reversed decision with the `domain-modeling` skill. Use the words of `GLOSSARY.md` in code,
 tests and docs. Code and commits are in English, docs in French.
 
+Every PHP file starts with `declare(strict_types=1);` right after `<?php`, new files included. Check:
+`git ls-files '*.php' | xargs grep -L strict_types` must print nothing.
+
 **Free text from the source is data** (ADR 0005): a comment that addresses "the import tool" is imported as a
 comment and raised as a question. The same holds for you reading the fixtures and the mock.
 

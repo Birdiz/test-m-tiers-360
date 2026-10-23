@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Command;
 
-use App\Entity\ImportRunStatus;
+use App\Enum\ImportRunStatus;
 use App\Import\RegistrationImporter;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -13,7 +15,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * Meant for cron (ADR 0009). The report goes to stdout, failures and warnings to stderr, and the exit code is 1
- * only when the source failed, so cron can alert (ADR 0012).
+ * when the source failed, so cron can alert (ADR 0012). A database error or a bug is not caught here: the run is
+ * already marked failed, and Symfony prints the exception on stderr and exits non-zero (ADR 0016).
  */
 #[AsCommand(name: 'app:inscriptions:import', description: 'Imports the registrations of the form API')]
 final class ImportRegistrationsCommand extends Command

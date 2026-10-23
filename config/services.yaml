@@ -26,7 +26,7 @@ services:
         class: Symfony\Component\HttpKernel\Log\Logger
         arguments: ['%env(LOG_LEVEL)%', 'php://stderr']
 
-    App\Import\FormApi:
+    App\Import\Source\FormApi:
         arguments:
             $maxRetries: 3
             $retryDelayMs: 1000
@@ -41,7 +41,7 @@ when@test:
             autoconfigure: true
         App\Tests\Import\FakeFormApi:
             public: true
-        App\Import\FormApi:
+        App\Import\Source\FormApi:
             arguments:
                 $maxRetries: 3
                 $retryDelayMs: 0
