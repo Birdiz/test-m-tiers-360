@@ -14,7 +14,7 @@ final class Version20261021155946 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Queue registrations from when they joined their session';
+        return 'Add registration.joined_session_at, backfilled from source_created_at, so the queue for capacity runs from when a registration joined its session, see ADR 0004';
     }
 
     public function up(Schema $schema): void

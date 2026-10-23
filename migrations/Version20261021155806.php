@@ -14,7 +14,7 @@ final class Version20261021155806 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Record unreadable submissions of each import run, and why a run failed or ended incomplete';
+        return 'Replace import_run.unreadable with a problems list and rename error to reason, to log left-out submissions and why a run failed or ended incomplete, see ADR 0003';
     }
 
     public function up(Schema $schema): void
