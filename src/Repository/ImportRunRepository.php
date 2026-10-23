@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\ImportRun;
 use App\Entity\ImportRunStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -24,7 +25,8 @@ class ImportRunRepository extends ServiceEntityRepository
             ->setParameter('completed', ImportRunStatus::Completed)
             ->setParameter('run', $run->getId())
             ->setMaxResults(1)
-            ->getOneOrNullResult();
+            // An explicit hydration mode lets phpstan-doctrine infer ?ImportRun from the DQL.
+            ->getOneOrNullResult(Query::HYDRATE_OBJECT);
     }
 
     /**

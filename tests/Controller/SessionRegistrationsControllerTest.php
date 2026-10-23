@@ -75,6 +75,14 @@ final class SessionRegistrationsControllerTest extends WebTestCase
         $this->client->request('GET', '/api/sessions/ses_01/inscriptions', server: ['HTTP_AUTHORIZATION' => 'Bearer test-ops-token']);
 
         self::assertResponseIsSuccessful();
+        // The shape the assertions below read: if the response does not have it, they fail.
+        /**
+         * @var array{
+         *     session: mixed,
+         *     summary: array{active: mixed, cancelled: mixed, removed: mixed, estimatedPeople: mixed, toReview: mixed, data: array{lastRunStatus: mixed}},
+         *     registrations: list<mixed>,
+         * } $body
+         */
         $body = json_decode((string) $this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
         self::assertSame(['id' => 'ses_01', 'label' => 'Bourg-en-Bresse — 17 novembre', 'date' => '2026-11-17', 'location' => 'Espace des métiers, Bourg-en-Bresse', 'capacity' => 80], $body['session']);
         self::assertSame(['active' => 1, 'cancelled' => 0, 'removed' => 0, 'estimatedPeople' => 1], array_intersect_key($body['summary'], array_flip(['active', 'cancelled', 'removed', 'estimatedPeople'])));

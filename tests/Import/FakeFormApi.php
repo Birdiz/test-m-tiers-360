@@ -56,7 +56,7 @@ final class FakeFormApi
      */
     public function script(int $page, MockResponse ...$responses): void
     {
-        $this->scripted[$page] = [...($this->scripted[$page] ?? []), ...$responses];
+        $this->scripted[$page] = [...($this->scripted[$page] ?? []), ...array_values($responses)];
     }
 
     /**

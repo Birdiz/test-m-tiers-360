@@ -23,10 +23,14 @@ final readonly class SubmissionNormalizer
     }
 
     /**
-     * @param array<string, mixed> $submission
+     * @param mixed $submission one entry of a page's data, as decoded: nothing guarantees it is an object
      */
-    public function normalize(array $submission): NormalizedSubmission
+    public function normalize(mixed $submission): NormalizedSubmission
     {
+        if (!\is_array($submission)) {
+            throw new UnreadableSubmission('not an object');
+        }
+
         $answers = \is_array($submission['answers'] ?? null) ? $submission['answers'] : [];
         $externalId = self::trimToNull($submission['id'] ?? null) ?? throw new UnreadableSubmission('no id');
         if (!$this->fits(Registration::class, 'externalId', $externalId)) {
