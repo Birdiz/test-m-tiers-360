@@ -27,6 +27,35 @@ class ImportRunRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /**
+     * Fails every run still running. A bulk query: run entities already loaded keep their old status.
+     */
+    public function failRunning(string $reason, \DateTimeImmutable $at): void
+    {
+        $this->getEntityManager()
+            ->createQuery('UPDATE '.ImportRun::class.' r SET r.status = :failed, r.reason = :reason, r.finishedAt = :at WHERE r.status = :running')
+            ->setParameter('failed', ImportRunStatus::Failed)
+            ->setParameter('reason', $reason)
+            ->setParameter('at', $at)
+            ->setParameter('running', ImportRunStatus::Running)
+            ->execute();
+    }
+
+    /**
+     * Writes how the run ended without flushing, which a closed entity manager cannot do. The counters keep what the
+     * last committed page wrote.
+     */
+    public function recordFailure(ImportRun $run): void
+    {
+        $this->getEntityManager()
+            ->createQuery('UPDATE '.ImportRun::class.' r SET r.status = :status, r.reason = :reason, r.finishedAt = :at WHERE r.id = :run')
+            ->setParameter('status', $run->getStatus())
+            ->setParameter('reason', $run->getReason())
+            ->setParameter('at', $run->getFinishedAt())
+            ->setParameter('run', $run->getId())
+            ->execute();
+    }
+
     public function lastFinished(): ?ImportRun
     {
         return $this->findOneBy(['status' => [ImportRunStatus::Completed, ImportRunStatus::Incomplete, ImportRunStatus::Failed]], ['id' => 'DESC']);
