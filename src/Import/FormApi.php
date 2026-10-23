@@ -2,13 +2,11 @@
 
 namespace App\Import;
 
-use App\Entity\Operation;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
@@ -25,7 +23,6 @@ final class FormApi
         #[Autowire(service: 'form_api.client')]
         private readonly HttpClientInterface $client,
         private readonly LoggerInterface $logger,
-        private readonly ValidatorInterface $validator,
         private readonly int $maxRetries,
         private readonly int $retryDelayMs,
     ) {
@@ -49,13 +46,8 @@ final class FormApi
                 || !\is_int($meta['total_pages'] ?? null) || !\is_array($form) || !\is_string($form['id'] ?? null)) {
                 throw new SourceUnreadable(\sprintf('Page %d does not have the documented shape.', $page));
             }
-            // Without a form id the database can hold, no registration can be tied to its operation (ADR 0014).
-            if (str_contains($form['id'], "\0") || 0 !== \count($this->validator->validatePropertyValue(Operation::class, 'externalFormId', $form['id']))) {
-                throw new SourceUnreadable(\sprintf('Page %d has a form id we cannot store.', $page));
-            }
-            $title = \is_string($form['title'] ?? null) ? str_replace("\0", '', $form['title']) : $form['id'];
 
-            yield new SourcePage($form['id'], mb_substr($title, 0, Operation::TITLE_LENGTH), $data, $meta['total']);
+            yield new SourcePage($form['id'], \is_string($form['title'] ?? null) ? $form['title'] : $form['id'], $data, $meta['total']);
 
             if ([] === $data || $page >= $meta['total_pages']) {
                 return;

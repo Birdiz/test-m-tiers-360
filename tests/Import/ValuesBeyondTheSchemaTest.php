@@ -71,11 +71,15 @@ final class ValuesBeyondTheSchemaTest extends ImportTestCase
         $this->formApi()->serve([Submissions::submission()]);
         $this->formApi()->form('frm_'.str_repeat('x', 61), 'Ain');
 
-        self::assertSame(ImportRunStatus::Failed, $this->runImport()->getStatus());
+        $failed = $this->runImport();
 
-        $this->formApi()->form('frm_7Hq2xL', str_repeat('T', 300));
+        // Like a source that cannot be read: nothing applied, nothing removed (ADR 0002).
+        self::assertSame([ImportRunStatus::Failed, 0], [$failed->getStatus(), $failed->getSeen()]);
+
+        $this->formApi()->form('frm_7Hq2xL', str_repeat('T', 300)."\0");
 
         self::assertSame(ImportRunStatus::Completed, $this->runImport()->getStatus());
+        self::assertSame(str_repeat('T', 255), $this->roster('ses_01')->session->getOperation()->getTitle());
     }
 
     public function testOverlongSessionDetailsAreCut(): void

@@ -10,9 +10,10 @@ la longueur de la colonne, `Range` d'un `integer` pour la capacité, pas d'anné
 valeur fausse ou vide que la base accepte n'est pas leur affaire. Les longueurs sont des constantes des entités
 (`Registration::NAME_LENGTH`…), lues par le mapping Doctrine et par la contrainte.
 
-Les entités ne sont construites qu'à partir de ce que rendent `SubmissionNormalizer` et `FormApi` : c'est là que
-chaque valeur est vérifiée, avec `validatePropertyValue` sur la propriété où elle finira, et que l'ADR 0003
-s'applique.
+Chaque valeur est vérifiée avant de devenir une entité, avec `validatePropertyValue` sur la propriété où elle
+finira, et c'est là que l'ADR 0003 s'applique : dans `SubmissionNormalizer` pour une soumission, dans
+`RegistrationImporter` pour le formulaire, avant la transaction de la page. `FormApi` ne fait que lire la source :
+il rend ce qu'elle sert, sans rien savoir de nos colonnes.
 
 - Une réponse que la base ne peut pas tenir (prénom, nom, e-mail, téléphone, structure) est importée avec le champ
   vide et une anomalie `too_long` qui garde la valeur brute. On ne la coupe pas : coupée, elle aurait l'air valide.
@@ -21,8 +22,8 @@ s'applique.
   importées.
 - Le libellé et le lieu d'une session, et le titre du formulaire, sont coupés à la longueur de leur colonne : ils
   ne décrivent personne et n'ont pas d'anomalie pour garder le reste.
-- Un identifiant de formulaire que la base ne peut pas tenir fait échouer le passage : aucune inscription ne
-  pourrait être rattachée.
+- Un identifiant de formulaire que la base ne peut pas tenir fait échouer le passage comme une source illisible :
+  aucune inscription ne pourrait être rattachée, et rien n'est retiré (ADR 0002).
 - Les octets nuls sont retirés du texte : aucune contrainte ne les voit, la base les tronque sans erreur.
 
 Côté lecture, `GET /api/sessions/{id}/inscriptions` n'accepte qu'un identifiant sans octet nul et de 64
