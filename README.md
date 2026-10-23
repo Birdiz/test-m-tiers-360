@@ -4,7 +4,7 @@ La commande `app:inscriptions:import` importe les inscriptions de l'API du formu
 peut tourner en cron. `GET /api/sessions/{id}/inscriptions` renvoie la synthèse d'une session. Les décisions
 sont dans [`docs/adr/`](docs/adr/) et le vocabulaire dans [`GLOSSARY.md`](GLOSSARY.md). Les consignes pour un
 agent sont dans [`CLAUDE.md`](CLAUDE.md) et ses skills dans [`.claude/skills/`](.claude/skills/)
-([ADR 0013](docs/adr/0013-consignes-agents-minimales-et-skills.md)).
+([ADR 0019](docs/adr/0019-consignes-agents-minimales-et-skills.md)).
 
 ## Lancer le projet
 
