@@ -11,15 +11,18 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\UniqueConstraint(columns: ['external_form_id'])]
 class Operation
 {
+    public const EXTERNAL_ID_LENGTH = 64;
+    public const TITLE_LENGTH = 255;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     private ?int $id = null;
 
     public function __construct(
-        #[ORM\Column(length: 64)]
+        #[ORM\Column(length: self::EXTERNAL_ID_LENGTH)]
         private string $externalFormId,
-        #[ORM\Column(length: 255)]
+        #[ORM\Column(length: self::TITLE_LENGTH)]
         private string $title,
     ) {
     }

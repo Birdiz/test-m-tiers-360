@@ -35,6 +35,11 @@ final class FakeFormApi
         $this->submissions = $submissions;
     }
 
+    public function form(string $id, string $title): void
+    {
+        $this->form = ['id' => $id, 'title' => $title];
+    }
+
     /**
      * Serves one of the kit's datasets (mock-api/data/).
      */

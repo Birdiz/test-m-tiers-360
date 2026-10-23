@@ -11,18 +11,24 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\UniqueConstraint(columns: ['operation_id', 'external_id'])]
 class Session
 {
+    public const EXTERNAL_ID_LENGTH = 64;
+    public const LABEL_LENGTH = 255;
+    public const LOCATION_LENGTH = 255;
+    /** Postgres `integer`. */
+    public const MAX_CAPACITY = 2_147_483_647;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: self::LABEL_LENGTH)]
     private string $label;
 
     #[ORM\Column(type: Types::DATE_IMMUTABLE)]
     private \DateTimeImmutable $date;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: self::LOCATION_LENGTH)]
     private string $location;
 
     #[ORM\Column]
@@ -32,7 +38,7 @@ class Session
         #[ORM\ManyToOne]
         #[ORM\JoinColumn(nullable: false)]
         private Operation $operation,
-        #[ORM\Column(length: 64)]
+        #[ORM\Column(length: self::EXTERNAL_ID_LENGTH)]
         private string $externalId,
         SessionSnapshot $snapshot,
     ) {

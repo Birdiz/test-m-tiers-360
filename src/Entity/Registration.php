@@ -17,6 +17,10 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['session_id'])]
 class Registration
 {
+    public const EXTERNAL_ID_LENGTH = 64;
+    public const NAME_LENGTH = 255;
+    public const STRUCTURE_NAME_LENGTH = 255;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -42,10 +46,10 @@ class Registration
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $joinedSessionAt;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: self::NAME_LENGTH)]
     private string $firstName;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: self::NAME_LENGTH)]
     private string $lastName;
 
     #[ORM\Column(length: 255, nullable: true)]
@@ -60,7 +64,7 @@ class Registration
     #[ORM\Column(length: 32, enumType: StructureType::class)]
     private StructureType $structureType;
 
-    #[ORM\Column(length: 255, nullable: true)]
+    #[ORM\Column(length: self::STRUCTURE_NAME_LENGTH, nullable: true)]
     private ?string $structureName;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
@@ -82,7 +86,7 @@ class Registration
         #[ORM\ManyToOne]
         #[ORM\JoinColumn(nullable: false)]
         private Operation $operation,
-        #[ORM\Column(length: 64)]
+        #[ORM\Column(length: self::EXTERNAL_ID_LENGTH)]
         private string $externalId,
         NormalizedSubmission $submission,
         Session $session,

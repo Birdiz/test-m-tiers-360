@@ -2,6 +2,7 @@
 
 namespace App\Import;
 
+use App\Entity\Operation;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
@@ -46,8 +47,13 @@ final class FormApi
                 || !\is_int($meta['total_pages'] ?? null) || !\is_array($form) || !\is_string($form['id'] ?? null)) {
                 throw new SourceUnreadable(\sprintf('Page %d does not have the documented shape.', $page));
             }
+            // Without a form id we can store, no registration can be tied to its operation (ADR 0014).
+            if ('' === $form['id'] || str_contains($form['id'], "\0") || mb_strlen($form['id']) > Operation::EXTERNAL_ID_LENGTH) {
+                throw new SourceUnreadable(\sprintf('Page %d has a form id we cannot store.', $page));
+            }
+            $title = \is_string($form['title'] ?? null) ? str_replace("\0", '', $form['title']) : $form['id'];
 
-            yield new SourcePage($form['id'], \is_string($form['title'] ?? null) ? $form['title'] : $form['id'], $data, $meta['total']);
+            yield new SourcePage($form['id'], mb_substr($title, 0, Operation::TITLE_LENGTH), $data, $meta['total']);
 
             if ([] === $data || $page >= $meta['total_pages']) {
                 return;

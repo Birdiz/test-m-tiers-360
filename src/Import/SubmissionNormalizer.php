@@ -2,12 +2,16 @@
 
 namespace App\Import;
 
+use App\Entity\Registration;
 use App\Entity\RegistrationStatus;
+use App\Entity\Session;
 use App\Entity\StructureType;
 
 /**
  * Turns one submission of the form API into our vocabulary. Never rejects a dirty answer:
  * the field is left empty and an anomaly says why (ADR 0003).
+ *
+ * The only gate before the database: what it returns fits our columns (ADR 0014).
  */
 final class SubmissionNormalizer
 {
@@ -18,6 +22,9 @@ final class SubmissionNormalizer
     {
         $answers = \is_array($submission['answers'] ?? null) ? $submission['answers'] : [];
         $externalId = self::optionalText($submission['id'] ?? null) ?? throw new UnreadableSubmission('no id');
+        if (mb_strlen($externalId) > Registration::EXTERNAL_ID_LENGTH) {
+            throw new UnreadableSubmission(\sprintf('id longer than %d characters', Registration::EXTERNAL_ID_LENGTH), $externalId);
+        }
         $status = RegistrationStatus::tryFrom(\is_string($submission['status'] ?? null) ? $submission['status'] : '')
             ?? throw new UnreadableSubmission('unknown status', $externalId);
         $createdAt = self::timestamp($submission['created_at'] ?? null) ?? throw new UnreadableSubmission('unreadable created_at', $externalId);
@@ -155,12 +162,42 @@ final class SubmissionNormalizer
             $anomalies[] = new Anomaly('structure_name', AnomalyCode::Missing, null);
         }
 
-        return $name;
+        return self::fitting('structure_name', $name, Registration::STRUCTURE_NAME_LENGTH, $anomalies);
     }
 
+    /**
+     * Drops NUL bytes: Postgres cannot store them, and the driver silently cuts a value at the first one.
+     */
     private static function optionalText(mixed $raw): ?string
     {
-        return \is_string($raw) && '' !== trim($raw) ? trim($raw) : null;
+        $text = \is_string($raw) ? trim(str_replace("\0", '', $raw)) : '';
+
+        return '' !== $text ? $text : null;
+    }
+
+    /**
+     * An answer longer than its column is left empty and flagged, like any other dirty answer: cut, it would
+     * look valid.
+     *
+     * @param list<Anomaly> $anomalies
+     */
+    private static function fitting(string $field, ?string $value, int $length, array &$anomalies): ?string
+    {
+        if (null === $value || mb_strlen($value) <= $length) {
+            return $value;
+        }
+
+        $anomalies[] = new Anomaly($field, AnomalyCode::TooLong, $value);
+
+        return null;
+    }
+
+    /**
+     * Postgres has no year 0 nor any year before it.
+     */
+    private static function storable(?\DateTimeImmutable $date): ?\DateTimeImmutable
+    {
+        return null !== $date && (int) $date->format('Y') >= 1 ? $date : null;
     }
 
     private static function session(mixed $raw): ?SessionSnapshot
@@ -169,17 +206,19 @@ final class SubmissionNormalizer
             return null;
         }
 
-        $date = \is_string($raw['date'] ?? null) ? self::strictDate($raw['date'], 'Y-m-d') : null;
-        if (null === $date || !\is_int($raw['capacity'] ?? null)) {
+        $date = self::storable(\is_string($raw['date'] ?? null) ? self::strictDate($raw['date'], 'Y-m-d') : null);
+        $capacity = $raw['capacity'] ?? null;
+        if (mb_strlen($id) > Session::EXTERNAL_ID_LENGTH || null === $date || !\is_int($capacity) || $capacity > Session::MAX_CAPACITY) {
             return null;
         }
 
+        // Descriptive, carries no personal data, and has no anomaly to hold the rest: cut to the column.
         return new SessionSnapshot(
             externalId: $id,
-            label: self::optionalText($raw['label'] ?? null) ?? $id,
+            label: mb_substr(self::optionalText($raw['label'] ?? null) ?? $id, 0, Session::LABEL_LENGTH),
             date: $date,
-            location: self::optionalText($raw['location'] ?? null) ?? '',
-            capacity: $raw['capacity'],
+            location: mb_substr(self::optionalText($raw['location'] ?? null) ?? '', 0, Session::LOCATION_LENGTH),
+            capacity: $capacity,
         );
     }
 
@@ -191,7 +230,7 @@ final class SubmissionNormalizer
 
         $timestamp = \DateTimeImmutable::createFromFormat(\DATE_ATOM, str_replace('Z', '+00:00', $raw));
 
-        return false === $timestamp ? null : $timestamp;
+        return self::storable(false === $timestamp ? null : $timestamp);
     }
 
     /**
@@ -204,6 +243,6 @@ final class SubmissionNormalizer
             $anomalies[] = new Anomaly($field, AnomalyCode::Missing, null);
         }
 
-        return $name ?? '';
+        return self::fitting($field, $name, Registration::NAME_LENGTH, $anomalies) ?? '';
     }
 }
