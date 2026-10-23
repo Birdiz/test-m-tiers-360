@@ -7,6 +7,18 @@ agent sont dans [`CLAUDE.md`](CLAUDE.md).
 
 ## Lancer le projet
 
+Avec `make` (`make` seul liste les cibles) :
+
+```bash
+make start
+make import
+make runs
+make summary SESSION=ses_03
+make check
+```
+
+Sans `make` :
+
 ```bash
 docker compose up -d --build
 docker compose exec app composer install

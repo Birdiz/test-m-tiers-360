@@ -18,6 +18,9 @@ docker compose exec app vendor/bin/phpunit
 docker compose exec app vendor/bin/phpstan analyse
 ```
 
+- The `Makefile` wraps these (`make` lists the targets; `make start`, `make import`, `make check`). Another
+  worktree's stack may already hold ports 8000/5432/8090: pass `COMPOSE="docker compose -f docker-compose.yml -f
+  <override>"` with an override that drops or moves the ports, and `APP_URL` to `make summary`.
 - The endpoint needs `Authorization: Bearer dev-ops-token` (from `.env.dev`), e.g. `/api/sessions/ses_03/inscriptions`.
 - `tests/bootstrap.php` drops and rebuilds the test database from the migrations on every run, so a mapping change
   without a migration goes red.
