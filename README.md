@@ -24,7 +24,7 @@ La CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) enchaîne les mê
 Sans `make` :
 
 ```bash
-docker compose up -d --build
+docker compose up -d --build --wait --force-recreate
 docker compose exec app composer install
 docker compose exec app bin/console doctrine:migrations:migrate -n
 docker compose exec app bin/console app:inscriptions:import
