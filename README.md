@@ -89,5 +89,6 @@ Claude Code, avec les skills de Matt Pocock dans l'ordre : *grilling* → *domai
 
 ## Temps consacré
 
-3 h 15 d'attention, en 3 sessions : 2 h pour la mise en place, le *grilling* et les ADR ; 1 h pour la
-conception, le TDD, la revue et les corrections ; 15 min pour le README et le `CLAUDE.md`.
+4 h 15 d'attention, en 4 sessions : 2 h pour la mise en place, le *grilling* et les ADR ; 1 h pour la
+conception, le TDD, la revue et les corrections ; 15 min pour le README et le `CLAUDE.md` ; 1 h pour une revue
+de qualité du code, menée en sessions parallèles.
