@@ -2,7 +2,9 @@
 
 namespace App\Tests\Import;
 
+use App\Entity\ImportRun;
 use App\Entity\ImportRunStatus;
+use Doctrine\DBAL\Exception\DriverException;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class RegistrationImporterTest extends ImportTestCase
@@ -170,5 +172,74 @@ final class RegistrationImporterTest extends ImportTestCase
 
         self::assertSame(ImportRunStatus::Completed, $run->getStatus());
         self::assertSame([0, 1], [$this->roster('ses_01')->summary->active, $this->roster('ses_01')->summary->cancelled]);
+    }
+
+    public function testDatabaseErrorOnAPageFailsTheRunWithoutRemovingAnything(): void
+    {
+        $this->formApi()->serveDataset('submissions-v1.json');
+        $this->runImport();
+        $this->formApi()->serveDataset('submissions-v2.json');
+        $this->runImport();
+        // Page 2 is served, then the database refuses to write it.
+        $this->formApi()->changeAfterPage(2, function (array $submissions): array {
+            $this->refuseWrites('registration');
+
+            return $submissions;
+        });
+
+        $error = $this->runFailingImport();
+
+        self::assertInstanceOf(DriverException::class, $error);
+        [, , $run] = $this->storedRuns();
+        self::assertSame(ImportRunStatus::Failed, $run->getStatus());
+        self::assertStringStartsWith(DriverException::class.': ', (string) $run->getReason());
+        self::assertStringContainsString('write refused by the test', (string) $run->getReason());
+        // Page 1 was committed before the failure, page 2 was rolled back.
+        self::assertSame(25, $run->getSeen());
+        self::assertSame(ImportRunStatus::Failed, $this->roster('ses_01')->summary->lastRunStatus);
+        // sub_5m3rfhnkfb left the source in v2 and this run would have been its second complete miss.
+        self::assertSame(0, $this->roster('ses_01')->summary->removed);
+
+        $this->acceptWrites();
+        self::assertSame(2, $this->runImport()->getRemoved());
+    }
+
+    public function testDatabaseErrorWhileCompletingTheRunRemovesNothing(): void
+    {
+        $this->formApi()->serveDataset('submissions-v1.json');
+        $this->runImport();
+        $this->formApi()->serveDataset('submissions-v2.json');
+        $this->runImport();
+        // Every page is written, then the run cannot be marked completed.
+        $this->refuseWrites('import_run', "NEW.status = 'completed'");
+
+        $this->runFailingImport();
+
+        // The removals were rolled back with the completed status: a run that is not completed removes nothing.
+        self::assertSame(0, $this->roster('ses_01')->summary->removed);
+        self::assertSame(ImportRunStatus::Failed, $this->storedRuns()[2]->getStatus());
+    }
+
+    public function testRunThatCouldNotRecordItsFailureIsFailedByTheNextRun(): void
+    {
+        $this->formApi()->serveDataset('submissions-v1.json');
+        $this->runImport();
+        // The run cannot write anything from page 2 on, its failure included.
+        $this->formApi()->changeAfterPage(2, function (array $submissions): array {
+            $this->refuseWrites('import_run');
+
+            return $submissions;
+        });
+        $this->runFailingImport();
+        self::assertSame(ImportRunStatus::Running, $this->storedRuns()[1]->getStatus());
+        $this->acceptWrites();
+
+        $this->runImport();
+
+        self::assertSame(
+            [ImportRunStatus::Completed, ImportRunStatus::Failed, ImportRunStatus::Completed],
+            array_map(static fn (ImportRun $run): ImportRunStatus => $run->getStatus(), $this->storedRuns()),
+        );
+        self::assertStringStartsWith('Interrupted', (string) $this->storedRuns()[1]->getReason());
     }
 }
